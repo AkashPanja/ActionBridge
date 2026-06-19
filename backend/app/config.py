@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     database_url_sync: str = "sqlite:///./doc_action_center.db"
     app_name: str = "Action Bridge API"
     debug: bool = True
+    secret_key: str = "change-me-in-production-use-a-long-random-string"
+    access_token_expire_minutes: int = 480
 
     @property
     def is_postgres(self) -> bool:
