@@ -129,4 +129,17 @@ frontend/
 
 ## License
 
-MIT
+**Action Bridge Non-Commercial License**
+
+Copyright © 2026 Akash Panja
+
+Permission is granted to any person to use, copy, modify, and distribute this software for any **non-commercial purpose**, including personal use, internal business use, educational use, and open-source contributions.
+
+**Commercial use is prohibited** without prior written permission from the owner. Commercial use includes, but is not limited to:
+- Selling the software, a modified version, or access to it
+- Offering the software as a hosted or managed service for a fee
+- Bundling the software into a commercial product that is sold
+
+This software is provided "as is", without warranty of any kind.
+
+For commercial licensing inquiries, contact the owner.
