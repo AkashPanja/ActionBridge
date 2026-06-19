@@ -1,0 +1,217 @@
+{
+  "info": {
+    "name": "Document Action Center",
+    "description": "API collection for the Document Action Center — Sprint 2",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8000/api/v1" },
+    { "key": "project_id", "value": "" },
+    { "key": "type_id", "value": "" },
+    { "key": "doc_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Create Project",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "pm.collectionVariables.set('project_id', jsonData.id);",
+              "console.log('Project ID saved:', jsonData.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Acme Corp\",\n  \"description\": \"Invoice processing for Acme\"\n}"
+        },
+        "url": { "raw": "{{base_url}}/projects", "host": ["{{base_url}}"], "path": ["projects"] }
+      }
+    },
+    {
+      "name": "2. List Projects",
+      "request": {
+        "method": "GET",
+        "url": { "raw": "{{base_url}}/projects", "host": ["{{base_url}}"], "path": ["projects"] }
+      }
+    },
+    {
+      "name": "3. Create Document Type",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "pm.collectionVariables.set('type_id', jsonData.id);",
+              "console.log('Type ID saved:', jsonData.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Invoice\",\n  \"schema_definition\": {\n    \"type\": \"object\",\n    \"title\": \"Invoice\",\n    \"required\": [\"invoice_number\", \"total_amount\"],\n    \"properties\": {\n      \"invoice_number\": { \"type\": \"string\", \"title\": \"Invoice #\" },\n      \"total_amount\": { \"type\": \"number\", \"title\": \"Total Amount\" },\n      \"currency\": { \"type\": \"string\", \"title\": \"Currency\", \"enum\": [\"USD\", \"EUR\", \"GBP\"] },\n      \"invoice_date\": { \"type\": \"string\", \"format\": \"date\", \"title\": \"Date\" }\n    }\n  }\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/projects/{{project_id}}/document-types",
+          "host": ["{{base_url}}"],
+          "path": ["projects", "{{project_id}}", "document-types"]
+        }
+      }
+    },
+    {
+      "name": "4. List Document Types",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/projects/{{project_id}}/document-types",
+          "host": ["{{base_url}}"],
+          "path": ["projects", "{{project_id}}", "document-types"]
+        }
+      }
+    },
+    {
+      "name": "5. Submit Document (RPA)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "pm.collectionVariables.set('doc_id', jsonData.id);",
+              "console.log('Doc ID saved:', jsonData.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"extracted_data\": {\n    \"invoice_number\": \"INV-2026-001\",\n    \"total_amount\": 5500.00,\n    \"currency\": \"USD\",\n    \"invoice_date\": \"2026-06-15\"\n  },\n  \"confidence_score\": 0.92\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/projects/{{project_id}}/documents/document-types/{{type_id}}?actor=rpa_bot",
+          "host": ["{{base_url}}"],
+          "path": ["projects", "{{project_id}}", "documents", "document-types", "{{type_id}}"],
+          "query": [{ "key": "actor", "value": "rpa_bot" }]
+        }
+      }
+    },
+    {
+      "name": "6. Document Inbox",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/projects/{{project_id}}/documents",
+          "host": ["{{base_url}}"],
+          "path": ["projects", "{{project_id}}", "documents"]
+        }
+      }
+    },
+    {
+      "name": "7. Filter: Pending Review",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/projects/{{project_id}}/documents?status=pending_review",
+          "host": ["{{base_url}}"],
+          "path": ["projects", "{{project_id}}", "documents"],
+          "query": [{ "key": "status", "value": "pending_review" }]
+        }
+      }
+    },
+    {
+      "name": "8. Get Document + History",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/projects/{{project_id}}/documents/{{doc_id}}?include_history=true",
+          "host": ["{{base_url}}"],
+          "path": ["projects", "{{project_id}}", "documents", "{{doc_id}}"],
+          "query": [{ "key": "include_history", "value": "true" }]
+        }
+      }
+    },
+    {
+      "name": "9. Update Field (Human Review)",
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"extracted_data\": {\n    \"invoice_number\": \"INV-2026-001\",\n    \"total_amount\": 5500.00,\n    \"currency\": \"USD\",\n    \"invoice_date\": \"2026-06-15\"\n  },\n  \"comment\": \"Corrected decimal place\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/projects/{{project_id}}/documents/{{doc_id}}?actor=user",
+          "host": ["{{base_url}}"],
+          "path": ["projects", "{{project_id}}", "documents", "{{doc_id}}"],
+          "query": [{ "key": "actor", "value": "user" }]
+        }
+      }
+    },
+    {
+      "name": "10. Approve Document",
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"approved\",\n  \"comment\": \"All fields verified\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/projects/{{project_id}}/documents/{{doc_id}}?actor=user",
+          "host": ["{{base_url}}"],
+          "path": ["projects", "{{project_id}}", "documents", "{{doc_id}}"],
+          "query": [{ "key": "actor", "value": "user" }]
+        }
+      }
+    },
+    {
+      "name": "11. Reject Document",
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"rejected\",\n  \"comment\": \"Invalid invoice number format\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/projects/{{project_id}}/documents/{{doc_id}}?actor=user",
+          "host": ["{{base_url}}"],
+          "path": ["projects", "{{project_id}}", "documents", "{{doc_id}}"],
+          "query": [{ "key": "actor", "value": "user" }]
+        }
+      }
+    },
+    {
+      "name": "12. Test Schema Validation (should fail 400)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"extracted_data\": {\n    \"bad_field\": \"nothing\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/projects/{{project_id}}/documents/document-types/{{type_id}}?actor=rpa_bot",
+          "host": ["{{base_url}}"],
+          "path": ["projects", "{{project_id}}", "documents", "document-types", "{{type_id}}"],
+          "query": [{ "key": "actor", "value": "rpa_bot" }]
+        }
+      }
+    }
+  ]
+}

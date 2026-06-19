@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-bg: 248 249 252;
+    --color-surface: 255 255 255;
+    --color-border: 226 230 240;
+    --color-text: 30 34 51;
+    --color-text-secondary: 92 102 128;
+    --color-brand: 99 102 241;
+    --color-accent: 244 63 94;
+  }
+
+  .dark {
+    --color-bg: 14 16 26;
+    --color-surface: 25 29 45;
+    --color-border: 46 52 72;
+    --color-text: 241 243 249;
+    --color-text-secondary: 163 171 191;
+    --color-brand: 129 140 248;
+    --color-accent: 251 113 133;
+  }
+
+  body {
+    @apply bg-[rgb(var(--color-bg))] text-[rgb(var(--color-text))] transition-colors duration-300;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-[rgb(var(--color-surface))]/80 backdrop-blur-xl border border-[rgb(var(--color-border))]/50;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
