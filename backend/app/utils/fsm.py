@@ -1,5 +1,5 @@
 STATUS_FLOW = {
-    "received": ["pending_review"],
+    "received": ["pending_review", "approved"],
     "pending_review": ["approved", "rejected"],
     "approved": [],
     "rejected": [],

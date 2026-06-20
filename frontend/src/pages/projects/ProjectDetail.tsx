@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { FileType, Inbox, Key, LayoutDashboard } from "lucide-react";
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { AnimatedPage } from "../../components/shared/AnimatedPage";
 import { PageHeader } from "../../components/shared/PageHeader";
 import { useAuth } from "../../contexts/AuthContext";
@@ -14,9 +14,10 @@ import { ProjectDashboard } from "../ProjectDashboard";
 
 export function ProjectDetail() {
   const { projectId } = useParams<{ projectId: string }>();
+  const [searchParams] = useSearchParams();
   const { data: project } = useProject(projectId!);
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "dashboard");
 
   const tabs = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },

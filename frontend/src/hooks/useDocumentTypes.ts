@@ -27,11 +27,36 @@ export function useDocumentType(projectId: string, typeId: string) {
   });
 }
 
+export function useUpdateDocumentType(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      typeId,
+      data,
+    }: {
+      typeId: string;
+      data: Parameters<typeof api.documentTypes.update>[2];
+    }) => api.documentTypes.update(projectId, typeId, data),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ["document-types", projectId] }),
+  });
+}
+
 export function useDeleteDocumentType(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (typeId: string) =>
       api.documentTypes.delete(projectId, typeId),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ["document-types", projectId] }),
+  });
+}
+
+export function useBulkDeleteDocumentTypes(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) =>
+      api.documentTypes.bulkDelete(projectId, ids),
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: ["document-types", projectId] }),
   });

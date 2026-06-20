@@ -2,6 +2,10 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
+
+class BulkIds(BaseModel):
+    ids: list[str]
+
 from app.utils.json_schema import validate_json_schema
 
 
@@ -34,3 +38,4 @@ class DocumentTypeResponse(BaseModel):
     validation_rules: dict | None
     created_at: datetime
     updated_at: datetime
+    document_count: int | None = None

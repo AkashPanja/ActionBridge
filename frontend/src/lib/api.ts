@@ -1,4 +1,4 @@
-import type { Document, DocumentType, Project } from "../types";
+import type { Document, DocumentType, Project, RegexPattern } from "../types";
 
 const BASE_URL = "/api/v1";
 
@@ -51,6 +51,11 @@ export const api = {
       }),
     delete: (id: string) =>
       request<void>(`/projects/${id}`, { method: "DELETE" }),
+    bulkDelete: (ids: string[]) =>
+      request<{ deleted: number }>("/projects/bulk-delete", {
+        method: "POST",
+        body: JSON.stringify({ ids }),
+      }),
   },
   documentTypes: {
     list: (projectId: string) =>
@@ -72,13 +77,33 @@ export const api = {
       }),
     delete: (projectId: string, typeId: string) =>
       request<void>(`/projects/${projectId}/document-types/${typeId}`, { method: "DELETE" }),
+    bulkDelete: (projectId: string, ids: string[]) =>
+      request<{ deleted: number }>(`/projects/${projectId}/document-types/bulk-delete`, {
+        method: "POST",
+        body: JSON.stringify({ ids }),
+      }),
+  },
+  regexPatterns: {
+    list: () => request<RegexPattern[]>("/regex-patterns"),
+    get: (id: string) => request<RegexPattern>(`/regex-patterns/${id}`),
+    create: (data: { name: string; pattern: string; flags?: string; description?: string }) =>
+      request<RegexPattern>("/regex-patterns", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: string, data: Partial<{ name: string; pattern: string; flags: string; description: string }>) =>
+      request<RegexPattern>(`/regex-patterns/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    delete: (id: string) => request<void>(`/regex-patterns/${id}`, { method: "DELETE" }),
   },
   documents: {
-    list: (projectId: string, params?: { status?: string; document_type_id?: string; search?: string }) => {
+    list: (projectId: string, params?: { status?: string; document_type_id?: string; search?: string; date_from?: string; date_to?: string; confidence_min?: number; confidence_max?: number; sort_by?: string; sort_order?: string }) => {
       const qs = new URLSearchParams();
       if (params?.status) qs.set("status", params.status);
       if (params?.document_type_id) qs.set("document_type_id", params.document_type_id);
       if (params?.search) qs.set("search", params.search);
+      if (params?.date_from) qs.set("date_from", params.date_from);
+      if (params?.date_to) qs.set("date_to", params.date_to);
+      if (params?.confidence_min != null) qs.set("confidence_min", String(params.confidence_min));
+      if (params?.confidence_max != null) qs.set("confidence_max", String(params.confidence_max));
+      if (params?.sort_by) qs.set("sort_by", params.sort_by);
+      if (params?.sort_order) qs.set("sort_order", params.sort_order);
       const q = qs.toString();
       return request<Document[]>(`/projects/${projectId}/documents${q ? `?${q}` : ""}`);
     },
@@ -93,6 +118,13 @@ export const api = {
       request<Document>(`/projects/${projectId}/documents/${docId}?actor=user`, {
         method: "PATCH",
         body: JSON.stringify(data),
+      }),
+    delete: (projectId: string, docId: string) =>
+      request<void>(`/projects/${projectId}/documents/${docId}`, { method: "DELETE" }),
+    bulkDelete: (projectId: string, ids: string[]) =>
+      request<{ deleted: number }>(`/projects/${projectId}/documents/bulk-delete`, {
+        method: "POST",
+        body: JSON.stringify({ ids }),
       }),
   },
 };

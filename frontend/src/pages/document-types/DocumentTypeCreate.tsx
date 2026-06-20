@@ -49,10 +49,8 @@ export function DocumentTypeCreateDialog({ projectId, open, onOpenChange }: Prop
 
   function handleTabChange(newTab: "visual" | "advanced") {
     if (newTab === "advanced") {
-      // Switching to advanced: populate textarea from visual
       setJsonText(JSON.stringify(schema, null, 2));
     } else {
-      // Switching to visual: validate JSON first
       try {
         const parsed = JSON.parse(jsonText);
         if (!parsed.type || !parsed.properties) {
@@ -91,7 +89,10 @@ export function DocumentTypeCreateDialog({ projectId, open, onOpenChange }: Prop
     }
 
     try {
-      await createDocType.mutateAsync({ name: name.trim(), schema_definition: finalSchema });
+      await createDocType.mutateAsync({
+        name: name.trim(),
+        schema_definition: finalSchema,
+      });
       setName("");
       setSchema(INVOICE_SCHEMA);
       setJsonText(JSON.stringify(INVOICE_SCHEMA, null, 2));
@@ -155,6 +156,8 @@ export function DocumentTypeCreateDialog({ projectId, open, onOpenChange }: Prop
         )}
 
         {error ? <p className="text-xs text-accent-500">{error}</p> : null}
+
+        <p className="text-xs text-surface-400">Validation rules can be added after creating the document type.</p>
 
         <div className="flex justify-end gap-3 pt-2">
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>

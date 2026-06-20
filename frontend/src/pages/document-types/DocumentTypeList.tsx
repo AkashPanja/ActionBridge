@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { FileType, Plus, Trash2 } from "lucide-react";
+import { FileType, Pencil, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
@@ -8,9 +8,11 @@ import { Badge } from "../../components/ui/Badge";
 import { Card } from "../../components/ui/Card";
 import { CardSkeleton } from "../../components/ui/Skeleton";
 import { EmptyState } from "../../components/ui/EmptyState";
-import { useDeleteDocumentType, useDocumentTypes } from "../../hooks/useDocumentTypes";
+import { useBulkDeleteDocumentTypes, useDeleteDocumentType, useDocumentTypes } from "../../hooks/useDocumentTypes";
 import { formatDate } from "../../lib/utils";
+import { ValidationRulesDialog } from "../../components/schema/ValidationRulesDialog";
 import { DocumentTypeCreateDialog } from "./DocumentTypeCreate";
+import { DocumentTypeEditDialog } from "./DocumentTypeEdit";
 
 const container = {
   hidden: { opacity: 0 },
@@ -35,16 +37,40 @@ export function DocumentTypeList({ projectId: propProjectId }: Props) {
   const { data: docTypes, isLoading } = useDocumentTypes(projectId);
   const { user } = useAuth();
   const deleteDocType = useDeleteDocumentType(projectId);
+  const bulkDelete = useBulkDeleteDocumentTypes(projectId);
   const [createOpen, setCreateOpen] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [editingDocType, setEditingDocType] = useState<{ id: string; name: string; schema_definition: Record<string, unknown>; validation_rules?: Record<string, unknown> | null } | null>(null);
+  const [rulesDocType, setRulesDocType] = useState<{ id: string; name: string; schema_definition: Record<string, unknown>; validation_rules?: Record<string, unknown> | null } | null>(null);
+
+  const canWrite = user && can(user.role, "document_types:write");
 
   const fieldCount = (schema: Record<string, unknown>) => {
     const props = (schema as { properties?: Record<string, unknown> }).properties;
     return props ? Object.keys(props).length : 0;
   };
 
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function handleBulkDelete() {
+    if (selected.size === 0) return;
+    if (confirm(`Delete ${selected.size} document type${selected.size > 1 ? "s" : ""}?`)) {
+      bulkDelete.mutate(Array.from(selected), {
+        onSuccess: () => setSelected(new Set()),
+      });
+    }
+  }
+
   return (
     <div>
-      {user && can(user.role, "document_types:write") ? (
+      {canWrite ? (
         <div className="mb-4 flex justify-end">
           <button
             onClick={() => setCreateOpen(true)}
@@ -63,70 +89,114 @@ export function DocumentTypeList({ projectId: propProjectId }: Props) {
           ))}
         </div>
       ) : docTypes && docTypes.length > 0 ? (
-        <motion.div
-          variants={container}
-          initial="hidden"
-          animate="show"
-          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
-        >
-          {docTypes.map((dt) => (
-            <motion.div key={dt.id} variants={item}>
-              <Card className="group relative overflow-hidden">
-                <div className="mb-3 flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
-                    <FileType className="h-5 w-5" />
+        <>
+          <motion.div
+            variants={container}
+            initial="hidden"
+            animate="show"
+            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          >
+            {docTypes.map((dt) => (
+              <motion.div key={dt.id} variants={item}>
+                <Card className="group relative overflow-hidden">
+                  <div className="mb-3 flex items-center gap-3">
+                    {canWrite ? (
+                      <input
+                        type="checkbox"
+                        checked={selected.has(dt.id)}
+                        onChange={() => toggle(dt.id)}
+                        className="h-4 w-4 shrink-0 rounded border-surface-300 text-brand-500 focus:ring-brand-500 dark:border-surface-600"
+                      />
+                    ) : null}
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
+                      <FileType className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="truncate text-sm font-semibold text-surface-900 dark:text-surface-100">
+                        {dt.name}
+                      </h3>
+                      <p className="text-xs text-surface-400">
+                        {fieldCount(dt.schema_definition)} fields
+                        {dt.document_count != null ? ` · ${dt.document_count} document${dt.document_count !== 1 ? "s" : ""}` : ""}
+                      </p>
+                    </div>
+                    <Badge variant="default">
+                      {formatDate(dt.created_at).split(",")[0]}
+                    </Badge>
+                    {canWrite ? (
+                      <>
+                        <button
+                          onClick={() => setEditingDocType({ id: dt.id, name: dt.name, schema_definition: dt.schema_definition, validation_rules: dt.validation_rules })}
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-surface-400 transition-all hover:bg-brand-50 hover:text-brand-500 dark:hover:bg-brand-900/20"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => setRulesDocType({ id: dt.id, name: dt.name, schema_definition: dt.schema_definition, validation_rules: dt.validation_rules })}
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-surface-400 transition-all hover:bg-emerald-50 hover:text-emerald-500 dark:hover:bg-emerald-900/20"
+                        >
+                          <ShieldCheck className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (confirm("Delete this document type?")) {
+                              deleteDocType.mutate(dt.id);
+                            }
+                          }}
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-surface-400 transition-all hover:bg-accent-50 hover:text-accent-500 dark:hover:bg-accent-900/20"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </>
+                    ) : null}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="truncate text-sm font-semibold text-surface-900 dark:text-surface-100">
-                      {dt.name}
-                    </h3>
-                    <p className="text-xs text-surface-400">
-                      {fieldCount(dt.schema_definition)} fields
-                    </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {Object.keys(
+                      (dt.schema_definition as { properties?: Record<string, unknown> }).properties ?? {},
+                    ).slice(0, 4).map((key) => (
+                      <span
+                        key={key}
+                        className="rounded-lg bg-surface-100 px-2 py-0.5 text-xs font-medium text-surface-600 dark:bg-surface-700 dark:text-surface-300"
+                      >
+                        {key.replace(/_/g, " ")}
+                      </span>
+                    ))}
+                    {fieldCount(dt.schema_definition) > 4 ? (
+                      <span className="rounded-lg bg-surface-100 px-2 py-0.5 text-xs font-medium text-surface-400 dark:bg-surface-700">
+                        +{fieldCount(dt.schema_definition) - 4}
+                      </span>
+                    ) : null}
                   </div>
-                  <Badge variant="default">
-                    {formatDate(dt.created_at).split(",")[0]}
-                  </Badge>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {Object.keys(
-                    (dt.schema_definition as { properties?: Record<string, unknown> }).properties ?? {},
-                  ).slice(0, 4).map((key) => (
-                    <span
-                      key={key}
-                      className="rounded-lg bg-surface-100 px-2 py-0.5 text-xs font-medium text-surface-600 dark:bg-surface-700 dark:text-surface-300"
-                    >
-                      {key.replace(/_/g, " ")}
-                    </span>
-                  ))}
-                  {fieldCount(dt.schema_definition) > 4 ? (
-                    <span className="rounded-lg bg-surface-100 px-2 py-0.5 text-xs font-medium text-surface-400 dark:bg-surface-700">
-                      +{fieldCount(dt.schema_definition) - 4}
-                    </span>
-                  ) : null}
-                </div>
-                {user && can(user.role, "document_types:write") ? (
-                  <button
-                    onClick={() => {
-                      if (confirm("Delete this document type?")) {
-                        deleteDocType.mutate(dt.id);
-                      }
-                    }}
-                    className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-lg text-surface-400 opacity-0 transition-all hover:bg-accent-50 hover:text-accent-500 group-hover:opacity-100 dark:hover:bg-accent-900/20"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                ) : null}
-              </Card>
-            </motion.div>
-          ))}
-        </motion.div>
+                </Card>
+              </motion.div>
+            ))}
+          </motion.div>
+
+          {canWrite && selected.size > 0 ? (
+            <div className="fixed bottom-8 left-1/2 z-50 -translate-x-1/2">
+              <div className="flex items-center gap-3 rounded-2xl border border-surface-300 bg-white px-5 py-3 shadow-xl dark:border-surface-600 dark:bg-surface-800">
+                <span className="text-sm font-medium text-surface-700 dark:text-surface-200">
+                  {selected.size} selected
+                </span>
+                <div className="h-5 w-px bg-surface-300 dark:bg-surface-600" />
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={bulkDelete.isPending}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-accent-500 px-3.5 py-1.5 text-sm font-medium text-white transition-all hover:bg-accent-600 active:scale-[0.97] disabled:opacity-50"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  {bulkDelete.isPending ? "Deleting..." : "Delete Selected"}
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </>
       ) : (
         <EmptyState
           icon={<FileType className="h-8 w-8" />}
           title="No document types"
           description="Define your first document schema. Each document type has its own JSON schema and validation rules."
-          action={(user && can(user.role, "document_types:write")) ? {
+          action={(canWrite) ? {
             label: "Create Document Type",
             onClick: () => setCreateOpen(true),
           } : undefined}
@@ -137,6 +207,19 @@ export function DocumentTypeList({ projectId: propProjectId }: Props) {
         projectId={projectId}
         open={createOpen}
         onOpenChange={setCreateOpen}
+      />
+      <DocumentTypeEditDialog
+        key={editingDocType?.id ?? "none"}
+        projectId={projectId}
+        docType={editingDocType ? { id: editingDocType.id, name: editingDocType.name, schema_definition: editingDocType.schema_definition, validation_rules: editingDocType.validation_rules } : null}
+        onClose={() => setEditingDocType(null)}
+      />
+      <ValidationRulesDialog
+        key={`rules-${rulesDocType?.id ?? "none"}`}
+        projectId={projectId}
+        docType={rulesDocType}
+        open={!!rulesDocType}
+        onOpenChange={(open) => { if (!open) setRulesDocType(null); }}
       />
     </div>
   );

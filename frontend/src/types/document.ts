@@ -17,7 +17,7 @@ export interface Document {
   status: string;
   extracted_data: Record<string, unknown>;
   confidence_score: number | null;
-  confidence_scores?: Record<string, number> | null;
+  confidence_scores?: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
   history?: AuditEvent[] | null;

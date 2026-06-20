@@ -1,8 +1,9 @@
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.document_instance import DocumentInstance
 from app.models.document_type import DocumentType
-from app.schemas.document_type import DocumentTypeCreate, DocumentTypeUpdate
+from app.schemas.document_type import BulkIds, DocumentTypeCreate, DocumentTypeUpdate
 from app.services.project_service import get_project
 
 
@@ -35,7 +36,7 @@ async def get_document_type(db: AsyncSession, type_id: str) -> DocumentType | No
 
 async def list_document_types(
     db: AsyncSession, project_id: str
-) -> list[DocumentType]:
+) -> list[dict]:
     result = await db.execute(
         select(DocumentType)
         .where(
@@ -44,7 +45,25 @@ async def list_document_types(
         )
         .order_by(DocumentType.created_at.desc())
     )
-    return list(result.scalars().all())
+    types = list(result.scalars().all())
+    if not types:
+        return []
+
+    doc_counts = await db.execute(
+        select(DocumentInstance.document_type_id, func.count(DocumentInstance.id).label("cnt"))
+        .where(
+            DocumentInstance.project_id == project_id,
+            DocumentInstance.is_deleted == False,
+            DocumentInstance.document_type_id.in_([t.id for t in types]),
+        )
+        .group_by(DocumentInstance.document_type_id)
+    )
+    count_map = {row.document_type_id: row.cnt for row in doc_counts}
+
+    return [
+        {**{k: v for k, v in t.__dict__.items() if k != "_sa_instance_state"}, "document_count": count_map.get(t.id, 0)}
+        for t in types
+    ]
 
 
 async def update_document_type(
@@ -53,7 +72,23 @@ async def update_document_type(
     doc_type = await get_document_type(db, type_id)
     if not doc_type:
         return None
+
     update_data = data.model_dump(exclude_unset=True)
+
+    if "schema_definition" in update_data and update_data["schema_definition"] is not None:
+        doc_count = await db.scalar(
+            select(func.count(DocumentInstance.id)).where(
+                DocumentInstance.document_type_id == type_id,
+                DocumentInstance.is_deleted == False,
+            )
+        )
+        if doc_count and doc_count > 0:
+            old_keys = set((doc_type.schema_definition.get("properties") or {}).keys())
+            new_keys = set((update_data["schema_definition"].get("properties") or {}).keys())
+            removed = old_keys - new_keys
+            if removed:
+                raise ValueError(f"Cannot remove fields {sorted(removed)}: documents exist for this type")
+
     for key, value in update_data.items():
         setattr(doc_type, key, value)
     await db.commit()
@@ -68,3 +103,17 @@ async def delete_document_type(db: AsyncSession, type_id: str) -> bool:
     doc_type.is_deleted = True
     await db.commit()
     return True
+
+
+async def bulk_delete_document_types(db: AsyncSession, project_id: str, ids: list[str]) -> int:
+    result = await db.execute(
+        update(DocumentType)
+        .where(
+            DocumentType.project_id == project_id,
+            DocumentType.id.in_(ids),
+            DocumentType.is_deleted == False,
+        )
+        .values(is_deleted=True)
+    )
+    await db.commit()
+    return result.rowcount

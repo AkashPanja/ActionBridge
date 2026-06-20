@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import AsyncSessionLocal, engine
 from app.models import Base
-from app.routers import document_types, documents, projects
+from app.routers import document_types, documents, projects, regex_patterns
 
 from .auth.router import router as auth_router
 
@@ -32,6 +32,7 @@ app.include_router(auth_router)
 app.include_router(projects.router)
 app.include_router(document_types.router)
 app.include_router(documents.router)
+app.include_router(regex_patterns.router)
 
 
 @app.get("/health")

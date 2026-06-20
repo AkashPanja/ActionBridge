@@ -6,7 +6,11 @@ from app.auth.schemas import (
     ApiKeyCreate,
     ApiKeyCreatedResponse,
     ApiKeyResponse,
+    CreateUserRequest,
     LoginRequest,
+    PasswordChangeRequest,
+    PasswordResetConfirm,
+    PasswordResetRequest,
     RegisterRequest,
     SetupRequest,
     SetupStatusResponse,
@@ -21,15 +25,21 @@ from app.auth.service import (
     create_api_key,
     create_initial_admin,
     create_user,
+    create_user_by_admin,
+    delete_user,
     get_user_by_email,
+    get_user_by_id,
+    hash_password,
     list_api_keys,
     list_users,
     reset_system,
     revoke_api_key,
     save_setting,
     update_user,
+    verify_password,
 )
 from app.database import get_db
+from app.services.email_service import send_email
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Auth"])
 
@@ -86,15 +96,109 @@ async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/me", response_model=UserResponse)
-async def me(user: UserResponse = Depends(get_current_active_user)):
+async def me(user=Depends(get_current_active_user)):
     return user
+
+
+@router.post("/me/password", status_code=200)
+async def change_password(
+    data: PasswordChangeRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_active_user),
+):
+    if not verify_password(data.current_password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    current_user.password_hash = hash_password(data.new_password)
+    await db.commit()
+    return {"message": "Password updated"}
+
+
+@router.post("/password-reset", status_code=200)
+async def request_password_reset(
+    data: PasswordResetRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    user = await get_user_by_email(db, data.email)
+    if not user:
+        return {"message": "If email exists, a reset link has been sent"}
+    token = create_access_token({"sub": user.id, "purpose": "password_reset"}, expires_minutes=60)
+    await send_email(db, data.email, "Password Reset", "password_reset", {
+        "name": user.name,
+        "reset_link": f"{'/reset-password?token=' + token}",
+    })
+    return {"message": "If email exists, a reset link has been sent"}
+
+
+@router.post("/password-reset/confirm", status_code=200)
+async def confirm_password_reset(
+    data: PasswordResetConfirm,
+    db: AsyncSession = Depends(get_db),
+):
+    from app.auth.service import decode_access_token
+    payload = decode_access_token(data.token)
+    if not payload or payload.get("purpose") != "password_reset":
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+    user = await get_user_by_id(db, payload["sub"])
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.password_hash = hash_password(data.new_password)
+    await db.commit()
+    return {"message": "Password has been reset"}
+
+
+@router.post("/users", response_model=UserResponse, status_code=201)
+async def create_user_endpoint(
+    data: CreateUserRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(RequirePermission("users:manage")),
+):
+    existing = await get_user_by_email(db, data.email)
+    if existing:
+        raise HTTPException(status_code=409, detail="Email already registered")
+    return await create_user_by_admin(db, data)
+
+
+@router.get("/users", response_model=list[UserResponse])
+async def get_users(
+    db: AsyncSession = Depends(get_db),
+    user=Depends(RequirePermission("users:manage")),
+):
+    return await list_users(db)
+
+
+@router.patch("/users/{user_id}", response_model=UserResponse)
+async def patch_user(
+    user_id: str,
+    data: UpdateUserRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(RequirePermission("users:manage")),
+):
+    if user_id == current_user.id and data.is_active is False:
+        raise HTTPException(status_code=400, detail="Cannot deactivate yourself")
+    updated = await update_user(db, user_id, data.model_dump(exclude_none=True))
+    if not updated:
+        raise HTTPException(status_code=404, detail="User not found")
+    return updated
+
+
+@router.delete("/users/{user_id}", status_code=204)
+async def delete_user_endpoint(
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(RequirePermission("users:manage")),
+):
+    if user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot delete yourself")
+    deleted = await delete_user(db, user_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="User not found")
 
 
 @router.post("/api-keys", response_model=ApiKeyCreatedResponse, status_code=201)
 async def generate_api_key(
     data: ApiKeyCreate,
     db: AsyncSession = Depends(get_db),
-    user = Depends(RequirePermission("api_keys:manage")),
+    user=Depends(RequirePermission("api_keys:manage")),
 ):
     api_key, raw_key = await create_api_key(db, data.project_id, data.label, data.scopes)
     return ApiKeyCreatedResponse(
@@ -107,7 +211,7 @@ async def generate_api_key(
 async def list_project_api_keys(
     project_id: str = Query(),
     db: AsyncSession = Depends(get_db),
-    user = Depends(RequirePermission("api_keys:manage")),
+    user=Depends(RequirePermission("api_keys:manage")),
 ):
     return await list_api_keys(db, project_id)
 
@@ -116,38 +220,17 @@ async def list_project_api_keys(
 async def delete_api_key(
     key_id: str,
     db: AsyncSession = Depends(get_db),
-    user = Depends(RequirePermission("api_keys:manage")),
+    user=Depends(RequirePermission("api_keys:manage")),
 ):
     deleted = await revoke_api_key(db, key_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="API key not found")
 
 
-@router.get("/users", response_model=list[UserResponse])
-async def get_users(
-    db: AsyncSession = Depends(get_db),
-    user = Depends(RequirePermission("users:manage")),
-):
-    return await list_users(db)
-
-
-@router.patch("/users/{user_id}", response_model=UserResponse)
-async def patch_user(
-    user_id: str,
-    data: UpdateUserRequest,
-    db: AsyncSession = Depends(get_db),
-    current_user = Depends(RequirePermission("users:manage")),
-):
-    updated = await update_user(db, user_id, data.model_dump(exclude_none=True))
-    if not updated:
-        raise HTTPException(status_code=404, detail="User not found")
-    return updated
-
-
 @router.post("/reset", status_code=200)
 async def reset(
     db: AsyncSession = Depends(get_db),
-    user = Depends(RequirePermission("users:manage")),
+    user=Depends(RequirePermission("users:manage")),
 ):
     await reset_system(db)
     return {"message": "System has been reset"}

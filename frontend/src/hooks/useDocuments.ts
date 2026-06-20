@@ -5,6 +5,12 @@ interface DocListParams {
   status?: string;
   document_type_id?: string;
   search?: string;
+  date_from?: string;
+  date_to?: string;
+  confidence_min?: number;
+  confidence_max?: number;
+  sort_by?: string;
+  sort_order?: string;
 }
 
 export function useDocuments(projectId: string, params?: DocListParams) {
@@ -12,6 +18,26 @@ export function useDocuments(projectId: string, params?: DocListParams) {
     queryKey: ["documents", projectId, params],
     queryFn: () => api.documents.list(projectId, params),
     enabled: !!projectId,
+  });
+}
+
+export function useDeleteDocument(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (docId: string) =>
+      api.documents.delete(projectId, docId),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ["documents", projectId] }),
+  });
+}
+
+export function useBulkDeleteDocuments(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) =>
+      api.documents.bulkDelete(projectId, ids),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ["documents", projectId] }),
   });
 }
 

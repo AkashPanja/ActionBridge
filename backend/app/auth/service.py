@@ -1,3 +1,4 @@
+import os
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -8,7 +9,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import ApiKey, User
-from app.auth.schemas import RegisterRequest, SetupRequest
+from app.auth.schemas import CreateUserRequest, RegisterRequest, SetupRequest
 from app.config import settings
 from app.models.audit_event import AuditEvent
 from app.models.document_instance import DocumentInstance
@@ -29,9 +30,9 @@ def verify_password(password: str, hash: str) -> bool:
     return pwd_context.verify(password, hash)
 
 
-def create_access_token(data: dict) -> str:
+def create_access_token(data: dict, expires_minutes: int | None = None) -> str:
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes)
+    expire = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes or settings.access_token_expire_minutes)
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, settings.secret_key, algorithm=ALGORITHM)
 
@@ -135,9 +136,8 @@ async def list_api_keys(db: AsyncSession, project_id: str) -> list[ApiKey]:
     return list(result.scalars().all())
 
 
-async def check_setup_required(db: AsyncSession) -> bool:
-    result = await db.execute(select(User).limit(1))
-    return result.scalar_one_or_none() is None
+async def check_setup_required(db: AsyncSession | None = None) -> bool:
+    return not os.path.exists(settings.setup_complete_file)
 
 
 async def create_initial_admin(db: AsyncSession, data: SetupRequest) -> User:
@@ -150,6 +150,7 @@ async def create_initial_admin(db: AsyncSession, data: SetupRequest) -> User:
     db.add(user)
     await db.commit()
     await db.refresh(user)
+    open(settings.setup_complete_file, "w").close()
     return user
 
 
@@ -181,11 +182,36 @@ async def reset_system(db: AsyncSession) -> None:
     await db.execute(delete(Project))
     await db.execute(delete(User))
     await db.commit()
+    if os.path.exists(settings.setup_complete_file):
+        os.remove(settings.setup_complete_file)
 
 
 async def list_users(db: AsyncSession) -> list[User]:
     result = await db.execute(select(User).order_by(User.created_at.desc()))
     return list(result.scalars().all())
+
+
+async def create_user_by_admin(db: AsyncSession, data: CreateUserRequest) -> User:
+    user = User(
+        email=data.email,
+        password_hash=hash_password(data.password),
+        name=data.name,
+        role=data.role,
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+
+async def delete_user(db: AsyncSession, user_id: str) -> bool:
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        return False
+    await db.delete(user)
+    await db.commit()
+    return True
 
 
 async def update_user(db: AsyncSession, user_id: str, data: dict) -> User | None:

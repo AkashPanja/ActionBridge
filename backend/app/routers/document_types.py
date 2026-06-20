@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.deps import RequirePermission, get_current_active_user
 from app.database import get_db
 from app.schemas.document_type import (
+    BulkIds,
     DocumentTypeCreate,
     DocumentTypeResponse,
     DocumentTypeUpdate,
@@ -62,8 +63,22 @@ async def update_document_type(
     doc_type = await document_type_service.get_document_type(db, type_id)
     if not doc_type or doc_type.project_id != project_id:
         raise HTTPException(status_code=404, detail="Document type not found")
-    updated = await document_type_service.update_document_type(db, type_id, data)
+    try:
+        updated = await document_type_service.update_document_type(db, type_id, data)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     return updated
+
+
+@router.post("/bulk-delete", status_code=200)
+async def bulk_delete_document_types(
+    project_id: str,
+    data: BulkIds,
+    db: AsyncSession = Depends(get_db),
+    user = Depends(RequirePermission("document_types:write")),
+):
+    count = await document_type_service.bulk_delete_document_types(db, project_id, data.ids)
+    return {"deleted": count}
 
 
 @router.delete("/{type_id}", status_code=204)

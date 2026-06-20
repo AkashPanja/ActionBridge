@@ -6,4 +6,5 @@ export interface DocumentType {
   validation_rules: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
+  document_count?: number;
 }

@@ -48,10 +48,31 @@ class SetupRequest(BaseModel):
     smtp_use_tls: bool = True
 
 
+class CreateUserRequest(BaseModel):
+    email: str
+    password: str
+    name: str
+    role: str = "reviewer"
+
+
 class UpdateUserRequest(BaseModel):
     name: str | None = None
     role: str | None = None
     is_active: bool | None = None
+
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+class PasswordResetRequest(BaseModel):
+    email: str
+
+
+class PasswordResetConfirm(BaseModel):
+    token: str
+    new_password: str
 
 
 class ApiKeyCreate(BaseModel):

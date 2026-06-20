@@ -1,217 +1,555 @@
 {
   "info": {
-    "name": "Document Action Center",
-    "description": "API collection for the Document Action Center — Sprint 2",
+    "name": "Action Bridge API",
+    "description": "Full API collection for Action Bridge — includes auth, projects, document types (with table support), document lifecycle, user management, API keys, and dashboard.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     { "key": "base_url", "value": "http://localhost:8000/api/v1" },
+    { "key": "auth_token", "value": "" },
     { "key": "project_id", "value": "" },
     { "key": "type_id", "value": "" },
-    { "key": "doc_id", "value": "" }
+    { "key": "doc_id", "value": "" },
+    { "key": "user_id", "value": "" },
+    { "key": "api_key_id", "value": "" }
   ],
   "item": [
     {
-      "name": "1. Create Project",
-      "event": [
+      "name": "Auth",
+      "item": [
         {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "var jsonData = pm.response.json();",
-              "pm.collectionVariables.set('project_id', jsonData.id);",
-              "console.log('Project ID saved:', jsonData.id);"
-            ]
+          "name": "A1. Setup Status",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/auth/status", "host": ["{{base_url}}"], "path": ["auth", "status"] }
+          }
+        },
+        {
+          "name": "A2. Setup System (first run)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.collectionVariables.set('auth_token', jsonData.access_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"admin123\",\n  \"name\": \"Admin\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/auth/setup", "host": ["{{base_url}}"], "path": ["auth", "setup"] }
+          }
+        },
+        {
+          "name": "A3. Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.collectionVariables.set('auth_token', jsonData.access_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"admin123\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth", "login"] }
+          }
+        },
+        {
+          "name": "A4. Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{auth_token}}" }],
+            "url": { "raw": "{{base_url}}/auth/me", "host": ["{{base_url}}"], "path": ["auth", "me"] }
           }
         }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"name\": \"Acme Corp\",\n  \"description\": \"Invoice processing for Acme\"\n}"
-        },
-        "url": { "raw": "{{base_url}}/projects", "host": ["{{base_url}}"], "path": ["projects"] }
-      }
+      ]
     },
     {
-      "name": "2. List Projects",
-      "request": {
-        "method": "GET",
-        "url": { "raw": "{{base_url}}/projects", "host": ["{{base_url}}"], "path": ["projects"] }
-      }
-    },
-    {
-      "name": "3. Create Document Type",
-      "event": [
+      "name": "Projects",
+      "item": [
         {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "var jsonData = pm.response.json();",
-              "pm.collectionVariables.set('type_id', jsonData.id);",
-              "console.log('Type ID saved:', jsonData.id);"
-            ]
+          "name": "P1. Create Project",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.collectionVariables.set('project_id', jsonData.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Acme Corp\",\n  \"description\": \"Invoice processing for Acme\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/projects", "host": ["{{base_url}}"], "path": ["projects"] }
+          }
+        },
+        {
+          "name": "P2. List Projects",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{auth_token}}" }],
+            "url": { "raw": "{{base_url}}/projects", "host": ["{{base_url}}"], "path": ["projects"] }
+          }
+        },
+        {
+          "name": "P3. Project Dashboard Stats",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{auth_token}}" }],
+            "url": { "raw": "{{base_url}}/projects/{{project_id}}/stats", "host": ["{{base_url}}"], "path": ["projects", "{{project_id}}", "stats"] }
           }
         }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"name\": \"Invoice\",\n  \"schema_definition\": {\n    \"type\": \"object\",\n    \"title\": \"Invoice\",\n    \"required\": [\"invoice_number\", \"total_amount\"],\n    \"properties\": {\n      \"invoice_number\": { \"type\": \"string\", \"title\": \"Invoice #\" },\n      \"total_amount\": { \"type\": \"number\", \"title\": \"Total Amount\" },\n      \"currency\": { \"type\": \"string\", \"title\": \"Currency\", \"enum\": [\"USD\", \"EUR\", \"GBP\"] },\n      \"invoice_date\": { \"type\": \"string\", \"format\": \"date\", \"title\": \"Date\" }\n    }\n  }\n}"
-        },
-        "url": {
-          "raw": "{{base_url}}/projects/{{project_id}}/document-types",
-          "host": ["{{base_url}}"],
-          "path": ["projects", "{{project_id}}", "document-types"]
-        }
-      }
+      ]
     },
     {
-      "name": "4. List Document Types",
-      "request": {
-        "method": "GET",
-        "url": {
-          "raw": "{{base_url}}/projects/{{project_id}}/document-types",
-          "host": ["{{base_url}}"],
-          "path": ["projects", "{{project_id}}", "document-types"]
-        }
-      }
-    },
-    {
-      "name": "5. Submit Document (RPA)",
-      "event": [
+      "name": "Document Types",
+      "item": [
         {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "var jsonData = pm.response.json();",
-              "pm.collectionVariables.set('doc_id', jsonData.id);",
-              "console.log('Doc ID saved:', jsonData.id);"
-            ]
+          "name": "DT1. Create (flat fields)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.collectionVariables.set('type_id', jsonData.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Simple Invoice\",\n  \"schema_definition\": {\n    \"type\": \"object\",\n    \"title\": \"Invoice\",\n    \"required\": [\"invoice_number\", \"total_amount\"],\n    \"properties\": {\n      \"invoice_number\": { \"type\": \"string\", \"title\": \"Invoice #\" },\n      \"total_amount\": { \"type\": \"number\", \"title\": \"Total Amount\" },\n      \"currency\": { \"type\": \"string\", \"title\": \"Currency\", \"enum\": [\"USD\", \"EUR\", \"GBP\"] },\n      \"invoice_date\": { \"type\": \"string\", \"format\": \"date\", \"title\": \"Date\" }\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}/document-types",
+              "host": ["{{base_url}}"],
+              "path": ["projects", "{{project_id}}", "document-types"]
+            }
+          }
+        },
+        {
+          "name": "DT2. Create (with table)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.collectionVariables.set('type_id', jsonData.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Invoice with Lines\",\n  \"schema_definition\": {\n    \"type\": \"object\",\n    \"title\": \"Invoice\",\n    \"required\": [\"invoice_number\", \"line_items\"],\n    \"properties\": {\n      \"invoice_number\": { \"type\": \"string\", \"title\": \"Invoice #\" },\n      \"total_amount\": { \"type\": \"number\", \"title\": \"Total\" },\n      \"line_items\": {\n        \"type\": \"array\",\n        \"title\": \"Line Items\",\n        \"items\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"description\": { \"type\": \"string\", \"title\": \"Description\" },\n            \"quantity\": { \"type\": \"number\", \"title\": \"Qty\" },\n            \"unit_price\": { \"type\": \"number\", \"title\": \"Unit Price\" },\n            \"total\": { \"type\": \"number\", \"title\": \"Total\" }\n          },\n          \"required\": [\"description\"]\n        }\n      }\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}/document-types",
+              "host": ["{{base_url}}"],
+              "path": ["projects", "{{project_id}}", "document-types"]
+            }
+          }
+        },
+        {
+          "name": "DT3. List Document Types",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{auth_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}/document-types",
+              "host": ["{{base_url}}"],
+              "path": ["projects", "{{project_id}}", "document-types"]
+            }
           }
         }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"extracted_data\": {\n    \"invoice_number\": \"INV-2026-001\",\n    \"total_amount\": 5500.00,\n    \"currency\": \"USD\",\n    \"invoice_date\": \"2026-06-15\"\n  },\n  \"confidence_score\": 0.92\n}"
+      ]
+    },
+    {
+      "name": "Documents",
+      "item": [
+        {
+          "name": "D1. Submit (flat data)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.collectionVariables.set('doc_id', jsonData.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"extracted_data\": {\n    \"invoice_number\": \"INV-2026-001\",\n    \"total_amount\": 5500.00,\n    \"currency\": \"USD\",\n    \"invoice_date\": \"2026-06-15\"\n  },\n  \"confidence_scores\": {\n    \"invoice_number\": 0.95,\n    \"total_amount\": 0.92,\n    \"currency\": 0.98,\n    \"invoice_date\": 0.90\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}/documents/document-types/{{type_id}}?actor=rpa_bot",
+              "host": ["{{base_url}}"],
+              "path": ["projects", "{{project_id}}", "documents", "document-types", "{{type_id}}"],
+              "query": [{ "key": "actor", "value": "rpa_bot" }]
+            }
+          }
         },
-        "url": {
-          "raw": "{{base_url}}/projects/{{project_id}}/documents/document-types/{{type_id}}?actor=rpa_bot",
-          "host": ["{{base_url}}"],
-          "path": ["projects", "{{project_id}}", "documents", "document-types", "{{type_id}}"],
-          "query": [{ "key": "actor", "value": "rpa_bot" }]
-        }
-      }
-    },
-    {
-      "name": "6. Document Inbox",
-      "request": {
-        "method": "GET",
-        "url": {
-          "raw": "{{base_url}}/projects/{{project_id}}/documents",
-          "host": ["{{base_url}}"],
-          "path": ["projects", "{{project_id}}", "documents"]
-        }
-      }
-    },
-    {
-      "name": "7. Filter: Pending Review",
-      "request": {
-        "method": "GET",
-        "url": {
-          "raw": "{{base_url}}/projects/{{project_id}}/documents?status=pending_review",
-          "host": ["{{base_url}}"],
-          "path": ["projects", "{{project_id}}", "documents"],
-          "query": [{ "key": "status", "value": "pending_review" }]
-        }
-      }
-    },
-    {
-      "name": "8. Get Document + History",
-      "request": {
-        "method": "GET",
-        "url": {
-          "raw": "{{base_url}}/projects/{{project_id}}/documents/{{doc_id}}?include_history=true",
-          "host": ["{{base_url}}"],
-          "path": ["projects", "{{project_id}}", "documents", "{{doc_id}}"],
-          "query": [{ "key": "include_history", "value": "true" }]
-        }
-      }
-    },
-    {
-      "name": "9. Update Field (Human Review)",
-      "request": {
-        "method": "PATCH",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"extracted_data\": {\n    \"invoice_number\": \"INV-2026-001\",\n    \"total_amount\": 5500.00,\n    \"currency\": \"USD\",\n    \"invoice_date\": \"2026-06-15\"\n  },\n  \"comment\": \"Corrected decimal place\"\n}"
+        {
+          "name": "D2. Submit (with table + nested confidence)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.collectionVariables.set('doc_id', jsonData.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"extracted_data\": {\n    \"invoice_number\": \"INV-2026-002\",\n    \"total_amount\": 150.00,\n    \"line_items\": [\n      { \"description\": \"Widget A\", \"quantity\": 2, \"unit_price\": 25.00, \"total\": 50.00 },\n      { \"description\": \"Widget B\", \"quantity\": 5, \"unit_price\": 20.00, \"total\": 100.00 }\n    ]\n  },\n  \"confidence_scores\": {\n    \"invoice_number\": 0.95,\n    \"total_amount\": 0.90,\n    \"line_items\": [\n      { \"description\": 0.92, \"quantity\": 0.85, \"unit_price\": 0.88, \"total\": 0.90 },\n      { \"description\": 0.90, \"quantity\": 0.85, \"unit_price\": 0.88, \"total\": 0.90 }\n    ]\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}/documents/document-types/{{type_id}}?actor=rpa_bot",
+              "host": ["{{base_url}}"],
+              "path": ["projects", "{{project_id}}", "documents", "document-types", "{{type_id}}"],
+              "query": [{ "key": "actor", "value": "rpa_bot" }]
+            }
+          }
         },
-        "url": {
-          "raw": "{{base_url}}/projects/{{project_id}}/documents/{{doc_id}}?actor=user",
-          "host": ["{{base_url}}"],
-          "path": ["projects", "{{project_id}}", "documents", "{{doc_id}}"],
-          "query": [{ "key": "actor", "value": "user" }]
+        {
+          "name": "D3. Inbox (all)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{auth_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}/documents",
+              "host": ["{{base_url}}"],
+              "path": ["projects", "{{project_id}}", "documents"]
+            }
+          }
+        },
+        {
+          "name": "D4. Filter: Pending Review",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{auth_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}/documents?status=pending_review",
+              "host": ["{{base_url}}"],
+              "path": ["projects", "{{project_id}}", "documents"],
+              "query": [{ "key": "status", "value": "pending_review" }]
+            }
+          }
+        },
+        {
+          "name": "D5. Get Document + History",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{auth_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}/documents/{{doc_id}}?include_history=true",
+              "host": ["{{base_url}}"],
+              "path": ["projects", "{{project_id}}", "documents", "{{doc_id}}"],
+              "query": [{ "key": "include_history", "value": "true" }]
+            }
+          }
+        },
+        {
+          "name": "D6. Update Fields (Human Review)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"extracted_data\": {\n    \"invoice_number\": \"INV-2026-001\",\n    \"total_amount\": 5500.00,\n    \"currency\": \"EUR\",\n    \"invoice_date\": \"2026-06-15\"\n  },\n  \"comment\": \"Corrected currency to EUR\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}/documents/{{doc_id}}?actor=user",
+              "host": ["{{base_url}}"],
+              "path": ["projects", "{{project_id}}", "documents", "{{doc_id}}"],
+              "query": [{ "key": "actor", "value": "user" }]
+            }
+          }
+        },
+        {
+          "name": "D7. Update Table Rows (Human Review)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"extracted_data\": {\n    \"invoice_number\": \"INV-2026-002\",\n    \"total_amount\": 155.00,\n    \"line_items\": [\n      { \"description\": \"Widget A (Corrected)\", \"quantity\": 2, \"unit_price\": 25.00, \"total\": 50.00 },\n      { \"description\": \"Widget B\", \"quantity\": 5, \"unit_price\": 21.00, \"total\": 105.00 }\n    ]\n  },\n  \"comment\": \"Corrected description and unit price\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}/documents/{{doc_id}}?actor=user",
+              "host": ["{{base_url}}"],
+              "path": ["projects", "{{project_id}}", "documents", "{{doc_id}}"],
+              "query": [{ "key": "actor", "value": "user" }]
+            }
+          }
+        },
+        {
+          "name": "D8. Approve Document",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"approved\",\n  \"comment\": \"All fields verified\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}/documents/{{doc_id}}?actor=user",
+              "host": ["{{base_url}}"],
+              "path": ["projects", "{{project_id}}", "documents", "{{doc_id}}"],
+              "query": [{ "key": "actor", "value": "user" }]
+            }
+          }
+        },
+        {
+          "name": "D9. Reject Document",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"rejected\",\n  \"comment\": \"Invalid invoice number format\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}/documents/{{doc_id}}?actor=user",
+              "host": ["{{base_url}}"],
+              "path": ["projects", "{{project_id}}", "documents", "{{doc_id}}"],
+              "query": [{ "key": "actor", "value": "user" }]
+            }
+          }
+        },
+        {
+          "name": "D10. Submit via API Key (RPA)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-API-Key", "value": "YOUR_API_KEY_HERE" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"extracted_data\": {\n    \"invoice_number\": \"INV-API-001\",\n    \"total_amount\": 99.99\n  },\n  \"confidence_scores\": {\n    \"invoice_number\": 0.99,\n    \"total_amount\": 0.97\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}/documents/document-types/{{type_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["projects", "{{project_id}}", "documents", "document-types", "{{type_id}}"]
+            }
+          }
         }
-      }
+      ]
     },
     {
-      "name": "10. Approve Document",
-      "request": {
-        "method": "PATCH",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"status\": \"approved\",\n  \"comment\": \"All fields verified\"\n}"
+      "name": "User Management",
+      "item": [
+        {
+          "name": "U1. List Users",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{auth_token}}" }],
+            "url": { "raw": "{{base_url}}/auth/users", "host": ["{{base_url}}"], "path": ["auth", "users"] }
+          }
         },
-        "url": {
-          "raw": "{{base_url}}/projects/{{project_id}}/documents/{{doc_id}}?actor=user",
-          "host": ["{{base_url}}"],
-          "path": ["projects", "{{project_id}}", "documents", "{{doc_id}}"],
-          "query": [{ "key": "actor", "value": "user" }]
+        {
+          "name": "U2. Update User Role",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"reviewer\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/users/{{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "users", "{{user_id}}"]
+            }
+          }
+        },
+        {
+          "name": "U3. Toggle User Active",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"is_active\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/users/{{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "users", "{{user_id}}"]
+            }
+          }
         }
-      }
+      ]
     },
     {
-      "name": "11. Reject Document",
-      "request": {
-        "method": "PATCH",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"status\": \"rejected\",\n  \"comment\": \"Invalid invoice number format\"\n}"
+      "name": "API Keys",
+      "item": [
+        {
+          "name": "AK1. Generate API Key",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.collectionVariables.set('api_key_id', jsonData.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"RPA Bot 1\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/projects/{{project_id}}/api-keys",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "projects", "{{project_id}}", "api-keys"]
+            }
+          }
         },
-        "url": {
-          "raw": "{{base_url}}/projects/{{project_id}}/documents/{{doc_id}}?actor=user",
-          "host": ["{{base_url}}"],
-          "path": ["projects", "{{project_id}}", "documents", "{{doc_id}}"],
-          "query": [{ "key": "actor", "value": "user" }]
+        {
+          "name": "AK2. List API Keys",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{auth_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/auth/projects/{{project_id}}/api-keys",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "projects", "{{project_id}}", "api-keys"]
+            }
+          }
+        },
+        {
+          "name": "AK3. Revoke API Key",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{auth_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/auth/projects/{{project_id}}/api-keys/{{api_key_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "projects", "{{project_id}}", "api-keys", "{{api_key_id}}"]
+            }
+          }
         }
-      }
+      ]
     },
     {
-      "name": "12. Test Schema Validation (should fail 400)",
-      "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"extracted_data\": {\n    \"bad_field\": \"nothing\"\n  }\n}"
-        },
-        "url": {
-          "raw": "{{base_url}}/projects/{{project_id}}/documents/document-types/{{type_id}}?actor=rpa_bot",
-          "host": ["{{base_url}}"],
-          "path": ["projects", "{{project_id}}", "documents", "document-types", "{{type_id}}"],
-          "query": [{ "key": "actor", "value": "rpa_bot" }]
+      "name": "System",
+      "item": [
+        {
+          "name": "S1. Reset System",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{auth_token}}" }],
+            "url": { "raw": "{{base_url}}/auth/reset", "host": ["{{base_url}}"], "path": ["auth", "reset"] }
+          }
         }
-      }
+      ]
+    },
+    {
+      "name": "Schema Validation Test",
+      "item": [
+        {
+          "name": "V1. Submit Invalid (should fail 400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"extracted_data\": {\n    \"bad_field\": \"nothing\"\n  },\n  \"confidence_scores\": {}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}/documents/document-types/{{type_id}}?actor=rpa_bot",
+              "host": ["{{base_url}}"],
+              "path": ["projects", "{{project_id}}", "documents", "document-types", "{{type_id}}"],
+              "query": [{ "key": "actor", "value": "rpa_bot" }]
+            }
+          }
+        }
+      ]
     }
   ]
 }

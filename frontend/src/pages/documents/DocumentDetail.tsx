@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ArrowLeft, CheckCircle2, History, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, History, Plus, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Badge } from "../../components/ui/Badge";
@@ -98,35 +98,114 @@ export function DocumentDetail() {
   const [formData, setFormData] = useState<Record<string, unknown>>({});
   const [comment, setComment] = useState("");
   const [hasChanges, setHasChanges] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   useEffect(() => {
-    if (doc?.extracted_data && Object.keys(formData).length === 0) {
-      setFormData({ ...(doc.extracted_data as Record<string, unknown>) });
+    if (docType?.schema_definition && Object.keys(formData).length === 0) {
+      const schema = docType.schema_definition as { properties?: Record<string, unknown> };
+      const existing = (doc?.extracted_data as Record<string, unknown>) ?? {};
+      const merged: Record<string, unknown> = {};
+      for (const key of Object.keys(schema.properties ?? {})) {
+        merged[key] = key in existing ? existing[key] : "";
+      }
+      setFormData(merged);
     }
-  }, [doc]);
+  }, [doc, docType]);
 
-  function handleFieldChange(key: string, value: string) {
+  function inferFieldType(key: string): string {
+    const prop = (docType?.schema_definition as { properties?: Record<string, unknown> })?.properties?.[key] as Record<string, unknown> | undefined;
+    return (prop?.type as string) ?? "string";
+  }
+
+  function coerceValue(key: string, rawValue: string): unknown {
+    const t = inferFieldType(key);
+    if (t === "number") return rawValue === "" ? "" : parseFloat(rawValue);
+    if (t === "boolean") return rawValue === "true" ? true : rawValue === "false" ? false : rawValue;
+    return rawValue;
+  }
+
+  function handleFieldChange(key: string, rawValue: string) {
+    const value = coerceValue(key, rawValue);
     setFormData((prev) => ({ ...prev, [key]: value }));
     setHasChanges(true);
+    setSaveError("");
+  }
+
+  function handleTableCellChange(key: string, rowIndex: number, colKey: string, rawValue: string) {
+    const items = ((docType?.schema_definition as { properties?: Record<string, unknown> })?.properties?.[key] as Record<string, unknown> | undefined)?.items as Record<string, unknown> | undefined;
+    const colProp = (items?.properties as Record<string, unknown> | undefined)?.[colKey] as Record<string, unknown> | undefined;
+    const colType = (colProp?.type as string) ?? "string";
+    let value: unknown = rawValue;
+    if (colType === "number") value = rawValue === "" ? "" : parseFloat(rawValue);
+    else if (colType === "boolean") value = rawValue === "true" ? true : rawValue === "false" ? false : rawValue;
+    setFormData((prev) => {
+      const rows = [...((prev[key] as unknown[]) ?? [])];
+      rows[rowIndex] = { ...(rows[rowIndex] as Record<string, unknown>), [colKey]: value };
+      return { ...prev, [key]: rows };
+    });
+    setHasChanges(true);
+    setSaveError("");
+  }
+
+  function addTableRow(key: string) {
+    setFormData((prev) => {
+      const rows = [...((prev[key] as unknown[]) ?? [])];
+      const prop = (docType?.schema_definition as { properties?: Record<string, unknown> })?.properties?.[key] as Record<string, unknown> | undefined;
+      const items = prop?.items as Record<string, unknown> | undefined;
+      const itemProps = (items?.properties as Record<string, unknown>) ?? {};
+      const newRow: Record<string, unknown> = {};
+      for (const colKey of Object.keys(itemProps)) {
+        newRow[colKey] = "";
+      }
+      rows.push(newRow);
+      return { ...prev, [key]: rows };
+    });
+    setHasChanges(true);
+    setSaveError("");
+  }
+
+  function removeTableRow(key: string, rowIndex: number) {
+    setFormData((prev) => {
+      const rows = [...((prev[key] as unknown[]) ?? [])];
+      rows.splice(rowIndex, 1);
+      return { ...prev, [key]: rows };
+    });
+    setHasChanges(true);
+    setSaveError("");
   }
 
   async function handleSave() {
     if (!doc) return;
-    await updateDoc.mutateAsync({ docId: doc.id, data: { extracted_data: formData, comment: comment || undefined } });
-    setHasChanges(false);
-    setComment("");
+    setSaveError("");
+    try {
+      await updateDoc.mutateAsync({ docId: doc.id, data: { extracted_data: formData, comment: comment || undefined } });
+      setHasChanges(false);
+      setComment("");
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to save");
+    }
   }
 
   async function handleApprove() {
     if (!doc) return;
-    await updateDoc.mutateAsync({ docId: doc.id, data: { status: "approved", comment: comment || undefined } });
-    setComment("");
+    setSaveError("");
+    try {
+      await updateDoc.mutateAsync({ docId: doc.id, data: { status: "approved", comment: comment || undefined } });
+      setComment("");
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to approve");
+    }
   }
 
   async function handleReject() {
     if (!doc) return;
-    await updateDoc.mutateAsync({ docId: doc.id, data: { status: "rejected", comment: comment || undefined } });
-    setComment("");
+    setSaveError("");
+    try {
+      await updateDoc.mutateAsync({ docId: doc.id, data: { status: "rejected", comment: comment || undefined } });
+      setComment("");
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to reject");
+    }
   }
 
   if (isLoading) {
@@ -149,13 +228,13 @@ export function DocumentDetail() {
   const schema = docType?.schema_definition as { properties?: Record<string, unknown>; required?: string[] } | undefined;
   const schemaProperties = schema?.properties ?? {};
   const required = schema?.required ?? [];
-  const confidenceScores = (doc.confidence_scores ?? {}) as Record<string, number>;
+  const confidenceScores = (doc.confidence_scores ?? {}) as Record<string, unknown>;
   const canEdit = doc.status === "pending_review" || doc.status === "received";
 
   return (
     <AnimatedPage>
       <button
-        onClick={() => navigate(`/projects/${projectId}`)}
+        onClick={() => navigate(`/projects/${projectId}?tab=documents`)}
         className="mb-4 flex items-center gap-1.5 text-sm text-surface-500 transition-colors hover:text-surface-700 dark:hover:text-surface-300"
       >
         <ArrowLeft className="h-4 w-4" />
@@ -203,12 +282,12 @@ export function DocumentDetail() {
                 const isRequired = required.includes(key);
                 const score = confidenceScores[key];
 
-                const borderClass = confidenceColor(score);
+                const borderClass = typeof score === "number" ? confidenceColor(score) : "border-surface-200 dark:border-surface-600";
                 const label = (
                   <span className="flex items-center gap-1.5">
                     {propTitle ?? key}
                     {isRequired ? <span className="text-accent-500">*</span> : null}
-                    {confidenceBadge(score)}
+                    {typeof score === "number" ? confidenceBadge(score) : null}
                   </span>
                 );
 
@@ -280,6 +359,130 @@ export function DocumentDetail() {
                   );
                 }
 
+                if (propType === "array") {
+                  const items = prop?.items as Record<string, unknown> | undefined;
+                  const itemProps = (items?.properties as Record<string, unknown>) ?? {};
+                  const rows = (value as Array<Record<string, unknown>>) ?? [];
+                  const rowScores = (score as Array<Record<string, number>> | undefined) ?? [];
+                  const itemRequired = (items?.required as string[]) ?? [];
+                  return (
+                    <div key={key} className="col-span-2 space-y-2">
+                      <label className="text-sm font-medium text-surface-700 dark:text-surface-300">
+                        <span className="flex items-center gap-1.5">
+                          {propTitle ?? key}
+                          {isRequired ? <span className="text-accent-500">*</span> : null}
+                        </span>
+                      </label>
+                      <div className="overflow-hidden rounded-xl border border-surface-200 dark:border-surface-600">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="bg-surface-50 dark:bg-surface-800">
+                              {Object.entries(itemProps).map(([colKey, colVal]) => {
+                                const colProp = colVal as Record<string, unknown>;
+                                return (
+                                  <th key={colKey} className="px-3 py-2 text-left text-xs font-medium text-surface-500">
+                                    {colProp.title as string ?? colKey}
+                                    {itemRequired.includes(colKey) ? <span className="ml-0.5 text-accent-500">*</span> : null}
+                                  </th>
+                                );
+                              })}
+                              <th className="w-10 px-2 py-2"></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {rows.map((row, ri) => (
+                              <tr key={ri} className="border-t border-surface-100 dark:border-surface-700">
+                                {Object.entries(itemProps).map(([colKey, colVal]) => {
+                                  const colProp = colVal as Record<string, unknown>;
+                                  const colType = (colProp.type as string) ?? "string";
+                                  const colFormat = colProp.format as string;
+                                  const colEnum = colProp.enum as string[] | undefined;
+                                  const cellScore = rowScores[ri]?.[colKey];
+                                  const cellBorder = confidenceColor(cellScore);
+                                  return (
+                                    <td key={colKey} className="px-3 py-1.5">
+                                      {colEnum ? (
+                                        <select
+                                          value={String(row[colKey] ?? "")}
+                                          onChange={(e) => handleTableCellChange(key, ri, colKey, e.target.value)}
+                                          disabled={!canEdit}
+                                          className={`w-full rounded-lg border-2 bg-white px-2 py-1.5 text-xs focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:opacity-50 dark:bg-surface-800 dark:text-surface-100 ${cellBorder}`}
+                                        >
+                                          <option value="">Select...</option>
+                                          {colEnum.map((opt) => (
+                                            <option key={opt} value={opt}>{opt}</option>
+                                          ))}
+                                        </select>
+                                      ) : colFormat === "date" ? (
+                                        <input
+                                          type="date"
+                                          value={String(row[colKey] ?? "")}
+                                          onChange={(e) => handleTableCellChange(key, ri, colKey, e.target.value)}
+                                          disabled={!canEdit}
+                                          className={`w-full rounded-lg border-2 bg-white px-2 py-1.5 text-xs focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:opacity-50 dark:bg-surface-800 dark:text-surface-100 ${cellBorder}`}
+                                        />
+                                      ) : colType === "number" ? (
+                                        <input
+                                          type="number"
+                                          step="any"
+                                          value={String(row[colKey] ?? "")}
+                                          onChange={(e) => handleTableCellChange(key, ri, colKey, e.target.value)}
+                                          disabled={!canEdit}
+                                          className={`w-full rounded-lg border-2 bg-white px-2 py-1.5 text-xs focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:opacity-50 dark:bg-surface-800 dark:text-surface-100 ${cellBorder}`}
+                                        />
+                                      ) : colType === "boolean" ? (
+                                        <select
+                                          value={String(row[colKey] ?? "")}
+                                          onChange={(e) => handleTableCellChange(key, ri, colKey, e.target.value)}
+                                          disabled={!canEdit}
+                                          className={`w-full rounded-lg border-2 bg-white px-2 py-1.5 text-xs focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:opacity-50 dark:bg-surface-800 dark:text-surface-100 ${cellBorder}`}
+                                        >
+                                          <option value="">Select...</option>
+                                          <option value="true">True</option>
+                                          <option value="false">False</option>
+                                        </select>
+                                      ) : (
+                                        <input
+                                          type="text"
+                                          value={String(row[colKey] ?? "")}
+                                          onChange={(e) => handleTableCellChange(key, ri, colKey, e.target.value)}
+                                          disabled={!canEdit}
+                                          className={`w-full rounded-lg border-2 bg-white px-2 py-1.5 text-xs focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:opacity-50 dark:bg-surface-800 dark:text-surface-100 ${cellBorder}`}
+                                        />
+                                      )}
+                                      {confidenceBadge(cellScore)}
+                                    </td>
+                                  );
+                                })}
+                                <td className="px-2 py-1.5 text-center">
+                                  {canEdit && rows.length > 1 ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => removeTableRow(key, ri)}
+                                      className="rounded p-1 text-accent-400 hover:bg-accent-50 hover:text-accent-600 dark:hover:bg-accent-900/20"
+                                    >
+                                      <XCircle className="h-3.5 w-3.5" />
+                                    </button>
+                                  ) : null}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      {canEdit ? (
+                        <button
+                          type="button"
+                          onClick={() => addTableRow(key)}
+                          className="flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
+                        >
+                          <Plus className="h-3.5 w-3.5" /> Add Row
+                        </button>
+                      ) : null}
+                    </div>
+                  );
+                }
+
                 return (
                   <div key={key} className="space-y-1.5">
                     <label className="text-sm font-medium text-surface-700 dark:text-surface-300">{label}</label>
@@ -304,12 +507,25 @@ export function DocumentDetail() {
                   onChange={(e) => setComment(e.target.value)}
                   id="comment"
                 />
+                {saveError ? (
+                  <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl bg-accent-50 px-4 py-2 text-sm text-accent-600 dark:bg-accent-900/20 dark:text-accent-400">{saveError}</motion.p>
+                ) : null}
                 <div className="flex gap-2">
                   <Button onClick={handleSave} isLoading={updateDoc.isPending} disabled={!hasChanges && !comment}>
                     Save Changes
                   </Button>
                   {hasChanges ? (
-                    <Button variant="ghost" onClick={() => { setFormData({ ...(doc.extracted_data as Record<string, unknown>) }); setHasChanges(false); }}>
+                    <Button variant="ghost" onClick={() => {
+                      const schema = docType?.schema_definition as { properties?: Record<string, unknown> } | undefined;
+                      const existing = (doc?.extracted_data as Record<string, unknown>) ?? {};
+                      const merged: Record<string, unknown> = {};
+                      for (const key of Object.keys(schema?.properties ?? {})) {
+                        merged[key] = key in existing ? existing[key] : "";
+                      }
+                      setFormData(merged);
+                      setHasChanges(false);
+                      setSaveError("");
+                    }}>
                       Reset
                     </Button>
                   ) : null}

@@ -5,11 +5,12 @@ interface Props {
   value: string;
   onChange: (value: string) => void;
   onValidJson: (json: Record<string, unknown>) => void;
+  readOnly?: boolean;
 }
 
 const MAX_HISTORY = 50;
 
-export function SchemaAdvancedEditor({ value, onChange, onValidJson }: Props) {
+export function SchemaAdvancedEditor({ value, onChange, onValidJson, readOnly }: Props) {
   const [undoStack, setUndoStack] = useState<string[]>([]);
   const [redoStack, setRedoStack] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -83,33 +84,38 @@ export function SchemaAdvancedEditor({ value, onChange, onValidJson }: Props) {
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-2">
-        <button
-          onClick={handleUndo}
-          disabled={undoStack.length === 0}
-          className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-surface-600 transition-colors hover:bg-surface-100 disabled:opacity-30 dark:text-surface-400 dark:hover:bg-surface-700"
-        >
-          <Undo2 className="h-3.5 w-3.5" /> Undo
-        </button>
-        <button
-          onClick={handleRedo}
-          disabled={redoStack.length === 0}
-          className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-surface-600 transition-colors hover:bg-surface-100 disabled:opacity-30 dark:text-surface-400 dark:hover:bg-surface-700"
-        >
-          <Redo2 className="h-3.5 w-3.5" /> Redo
-        </button>
-        <span className="text-xs text-surface-400">
-          Ctrl+Z / Ctrl+Y
-        </span>
-      </div>
+      {!readOnly ? (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleUndo}
+            disabled={undoStack.length === 0}
+            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-surface-600 transition-colors hover:bg-surface-100 disabled:opacity-30 dark:text-surface-400 dark:hover:bg-surface-700"
+          >
+            <Undo2 className="h-3.5 w-3.5" /> Undo
+          </button>
+          <button
+            onClick={handleRedo}
+            disabled={redoStack.length === 0}
+            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-surface-600 transition-colors hover:bg-surface-100 disabled:opacity-30 dark:text-surface-400 dark:hover:bg-surface-700"
+          >
+            <Redo2 className="h-3.5 w-3.5" /> Redo
+          </button>
+          <span className="text-xs text-surface-400">
+            Ctrl+Z / Ctrl+Y
+          </span>
+        </div>
+      ) : null}
 
       <textarea
         ref={textareaRef}
         value={value}
         onChange={(e) => handleChange(e.target.value)}
-        onKeyDown={handleKeyDown}
+        onKeyDown={readOnly ? undefined : handleKeyDown}
         rows={16}
+        readOnly={readOnly}
         className={`w-full rounded-xl border bg-surface-50 px-4 py-3 font-mono text-xs leading-relaxed text-surface-900 focus:outline-none focus:ring-2 dark:bg-surface-800 dark:text-surface-100 ${
+          readOnly ? "cursor-default" : ""
+        } ${
           error
             ? "border-accent-400 focus:ring-accent-500/20"
             : "border-surface-300 focus:border-brand-500 focus:ring-brand-500/20 dark:border-surface-600"

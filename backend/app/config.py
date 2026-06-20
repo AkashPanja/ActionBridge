@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     debug: bool = True
     secret_key: str = "change-me-in-production-use-a-long-random-string"
     access_token_expire_minutes: int = 480
+    setup_complete_file: str = ".setup-complete"
 
     @property
     def is_postgres(self) -> bool:

@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.deps import RequirePermission, get_current_active_user
 from app.database import get_db
+from app.schemas.document_type import BulkIds
 from app.schemas.project import ProjectCreate, ProjectResponse, ProjectStats, ProjectUpdate
 from app.services import project_service
 
@@ -15,7 +16,10 @@ async def create_project(
     db: AsyncSession = Depends(get_db),
     user = Depends(RequirePermission("projects:write")),
 ):
-    return await project_service.create_project(db, data)
+    try:
+        return await project_service.create_project(db, data)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
 
 
 @router.get("", response_model=list[ProjectResponse])
@@ -46,7 +50,10 @@ async def update_project(
     db: AsyncSession = Depends(get_db),
     user = Depends(RequirePermission("projects:write")),
 ):
-    project = await project_service.update_project(db, project_id, data)
+    try:
+        project = await project_service.update_project(db, project_id, data)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     return project
@@ -59,6 +66,16 @@ async def get_project_stats(
     user = Depends(get_current_active_user),
 ):
     return await project_service.get_project_stats(db, project_id)
+
+
+@router.post("/bulk-delete", status_code=200)
+async def bulk_delete_projects(
+    data: BulkIds,
+    db: AsyncSession = Depends(get_db),
+    user = Depends(RequirePermission("projects:write")),
+):
+    count = await project_service.bulk_delete_projects(db, data.ids)
+    return {"deleted": count}
 
 
 @router.delete("/{project_id}", status_code=204)

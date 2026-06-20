@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import case, func, select
+from sqlalchemy import case, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.document_instance import DocumentInstance
@@ -10,6 +10,11 @@ from app.schemas.project import ProjectCreate, ProjectUpdate
 
 
 async def create_project(db: AsyncSession, data: ProjectCreate) -> Project:
+    existing = await db.execute(
+        select(Project).where(Project.name == data.name, Project.is_deleted == False)
+    )
+    if existing.scalar_one_or_none():
+        raise ValueError(f"Project with name '{data.name}' already exists")
     project = Project(name=data.name, description=data.description)
     db.add(project)
     await db.commit()
@@ -42,6 +47,12 @@ async def update_project(
     if not project:
         return None
     update_data = data.model_dump(exclude_unset=True)
+    if "name" in update_data and update_data["name"] != project.name:
+        existing = await db.execute(
+            select(Project).where(Project.name == update_data["name"], Project.is_deleted == False, Project.id != project_id)
+        )
+        if existing.scalar_one_or_none():
+            raise ValueError(f"Project with name '{update_data['name']}' already exists")
     for key, value in update_data.items():
         setattr(project, key, value)
     await db.commit()
@@ -112,3 +123,13 @@ async def delete_project(db: AsyncSession, project_id: str) -> bool:
     project.is_deleted = True
     await db.commit()
     return True
+
+
+async def bulk_delete_projects(db: AsyncSession, ids: list[str]) -> int:
+    result = await db.execute(
+        update(Project)
+        .where(Project.id.in_(ids), Project.is_deleted == False)
+        .values(is_deleted=True)
+    )
+    await db.commit()
+    return result.rowcount

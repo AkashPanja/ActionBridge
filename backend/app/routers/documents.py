@@ -11,6 +11,7 @@ from app.schemas.document import (
     DocumentSubmit,
     DocumentUpdate,
 )
+from app.schemas.document_type import BulkIds
 from app.services import document_service
 
 router = APIRouter(prefix="/api/v1/projects/{project_id}/documents", tags=["Documents"])
@@ -43,10 +44,19 @@ async def list_documents(
     status: str | None = Query(None),
     document_type_id: str | None = Query(None),
     search: str | None = Query(None),
+    date_from: str | None = Query(None),
+    date_to: str | None = Query(None),
+    confidence_min: float | None = Query(None),
+    confidence_max: float | None = Query(None),
+    sort_by: str | None = Query(None),
+    sort_order: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
     user = Depends(RequirePermission("documents:read")),
 ):
-    docs = await document_service.list_documents(db, project_id, status, document_type_id, search)
+    from datetime import datetime
+    parsed_date_from = datetime.fromisoformat(date_from) if date_from else None
+    parsed_date_to = datetime.fromisoformat(date_to) if date_to else None
+    docs = await document_service.list_documents(db, project_id, status, document_type_id, search, parsed_date_from, parsed_date_to, confidence_min, confidence_max, sort_by, sort_order)
     result = []
     for doc in docs:
         dt = None
@@ -106,3 +116,26 @@ async def update_document(
         **{k: v for k, v in result.__dict__.items() if k != "_sa_instance_state"},
         history=history,
     )
+
+
+@router.post("/bulk-delete", status_code=200)
+async def bulk_delete_documents(
+    project_id: str,
+    data: BulkIds,
+    db: AsyncSession = Depends(get_db),
+    user = Depends(RequirePermission("documents:write")),
+):
+    count = await document_service.bulk_delete_documents(db, project_id, data.ids)
+    return {"deleted": count}
+
+
+@router.delete("/{document_id}", status_code=204)
+async def delete_document(
+    project_id: str,
+    document_id: str,
+    db: AsyncSession = Depends(get_db),
+    user = Depends(RequirePermission("documents:write")),
+):
+    deleted = await document_service.delete_document(db, project_id, document_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Document not found")

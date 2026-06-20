@@ -13,6 +13,7 @@ dist/
 # Database
 *.db
 *.sqlite
+.setup-complete
 
 # IDE
 .vscode/

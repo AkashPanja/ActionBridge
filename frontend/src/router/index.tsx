@@ -8,6 +8,7 @@ import { NotFound } from "../pages/NotFound";
 import { ProjectDetail } from "../pages/projects/ProjectDetail";
 import { ProjectList } from "../pages/projects/ProjectList";
 import { SettingsPage } from "../pages/SettingsPage";
+import { ValidationPatternsPage } from "../pages/ValidationPatternsPage";
 import { SetupPage } from "../pages/auth/SetupPage";
 import { UserManagement } from "../pages/UserManagement";
 
@@ -34,6 +35,7 @@ export const router = createBrowserRouter([
       { path: "projects/:projectId/api-keys", element: <ApiKeys /> },
       { path: "users", element: <UserManagement /> },
       { path: "settings", element: <SettingsPage /> },
+      { path: "validation-patterns", element: <ValidationPatternsPage /> },
       { path: "*", element: <NotFound /> },
     ],
   },

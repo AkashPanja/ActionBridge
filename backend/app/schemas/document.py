@@ -5,22 +5,12 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 class DocumentSubmit(BaseModel):
     extracted_data: dict
-    confidence_scores: dict[str, float] | None = None
-
-    @field_validator("confidence_scores")
-    @classmethod
-    def validate_scores(cls, v, info):
-        if v is None:
-            return v
-        for key, score in v.items():
-            if not isinstance(score, (int, float)) or score < 0 or score > 1:
-                raise ValueError(f"Score for '{key}' must be between 0 and 1")
-        return v
+    confidence_scores: dict | None = None
 
 
 class DocumentUpdate(BaseModel):
     extracted_data: dict | None = None
-    confidence_scores: dict[str, float] | None = None
+    confidence_scores: dict | None = None
     status: str | None = None
     comment: str | None = None
 

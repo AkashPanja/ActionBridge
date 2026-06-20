@@ -1,4 +1,4 @@
-import { FolderKanban, GitCompareArrows, LogOut, Plus, Settings, Users, Key } from "lucide-react";
+import { FileCode, FolderKanban, GitCompareArrows, LogOut, Plus, Settings, Users, Key } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { useProjects } from "../../hooks/useProjects";
@@ -71,6 +71,13 @@ export function Sidebar() {
             >
               <Settings className="h-4 w-4" />
               Settings
+            </Link>
+            <Link
+              to="/validation-patterns"
+              className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-surface-500 transition-all hover:bg-surface-100 hover:text-surface-700 dark:text-surface-400 dark:hover:bg-surface-700/50 dark:hover:text-surface-200"
+            >
+              <FileCode className="h-4 w-4" />
+              Validation Patterns
             </Link>
           </>
         ) : null}
