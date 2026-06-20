@@ -6,7 +6,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import AsyncSessionLocal, engine
 from app.models import Base
-from app.routers import document_types, documents, projects, regex_patterns
+from app.routers import (
+    attachments,
+    comments,
+    document_types,
+    documents,
+    invitations,
+    notifications,
+    projects,
+    regex_patterns,
+    settings as settings_router,
+    subscriptions,
+)
 
 from .auth.router import router as auth_router
 
@@ -33,6 +44,12 @@ app.include_router(projects.router)
 app.include_router(document_types.router)
 app.include_router(documents.router)
 app.include_router(regex_patterns.router)
+app.include_router(settings_router.router)
+app.include_router(notifications.router)
+app.include_router(comments.router)
+app.include_router(invitations.router)
+app.include_router(subscriptions.router)
+app.include_router(attachments.router)
 
 
 @app.get("/health")

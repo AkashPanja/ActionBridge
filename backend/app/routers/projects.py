@@ -4,7 +4,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.deps import RequirePermission, get_current_active_user
 from app.database import get_db
 from app.schemas.document_type import BulkIds
-from app.schemas.project import ProjectCreate, ProjectResponse, ProjectStats, ProjectUpdate
+from app.schemas.project import (
+    InviteRequest,
+    MemberResponse,
+    ProjectCreate,
+    ProjectResponse,
+    ProjectStats,
+    ProjectUpdate,
+)
 from app.services import project_service
 
 router = APIRouter(prefix="/api/v1/projects", tags=["Projects"])
@@ -14,10 +21,10 @@ router = APIRouter(prefix="/api/v1/projects", tags=["Projects"])
 async def create_project(
     data: ProjectCreate,
     db: AsyncSession = Depends(get_db),
-    user = Depends(RequirePermission("projects:write")),
+    user=Depends(RequirePermission("projects:write")),
 ):
     try:
-        return await project_service.create_project(db, data)
+        return await project_service.create_project(db, data, user_id=user.id)
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
 
@@ -26,16 +33,17 @@ async def create_project(
 async def list_projects(
     search: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    user = Depends(get_current_active_user),
+    user=Depends(get_current_active_user),
 ):
-    return await project_service.list_projects(db, search)
+    is_admin = user.role == "admin"
+    return await project_service.list_projects(db, search, user_id=user.id, is_admin=is_admin)
 
 
 @router.get("/{project_id}", response_model=ProjectResponse)
 async def get_project(
     project_id: str,
     db: AsyncSession = Depends(get_db),
-    user = Depends(get_current_active_user),
+    user=Depends(get_current_active_user),
 ):
     project = await project_service.get_project(db, project_id)
     if not project:
@@ -48,7 +56,7 @@ async def update_project(
     project_id: str,
     data: ProjectUpdate,
     db: AsyncSession = Depends(get_db),
-    user = Depends(RequirePermission("projects:write")),
+    user=Depends(RequirePermission("projects:write")),
 ):
     try:
         project = await project_service.update_project(db, project_id, data)
@@ -63,7 +71,7 @@ async def update_project(
 async def get_project_stats(
     project_id: str,
     db: AsyncSession = Depends(get_db),
-    user = Depends(get_current_active_user),
+    user=Depends(get_current_active_user),
 ):
     return await project_service.get_project_stats(db, project_id)
 
@@ -72,7 +80,7 @@ async def get_project_stats(
 async def bulk_delete_projects(
     data: BulkIds,
     db: AsyncSession = Depends(get_db),
-    user = Depends(RequirePermission("projects:write")),
+    user=Depends(RequirePermission("projects:write")),
 ):
     count = await project_service.bulk_delete_projects(db, data.ids)
     return {"deleted": count}
@@ -82,8 +90,60 @@ async def bulk_delete_projects(
 async def delete_project(
     project_id: str,
     db: AsyncSession = Depends(get_db),
-    user = Depends(RequirePermission("projects:write")),
+    user=Depends(RequirePermission("projects:write")),
 ):
     deleted = await project_service.delete_project(db, project_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Project not found")
+
+
+@router.get("/{project_id}/members", response_model=list[MemberResponse])
+async def list_members(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(RequirePermission("projects:read")),
+):
+    project = await project_service.get_project(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return await project_service.list_members(db, project_id)
+
+
+@router.post("/{project_id}/invite", response_model=MemberResponse, status_code=201)
+async def invite_member(
+    project_id: str,
+    data: InviteRequest,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(RequirePermission("projects:write")),
+):
+    project = await project_service.get_project(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    try:
+        return await project_service.invite_member(db, project_id, user.id, data.user_id, data.role)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
+@router.patch("/members/{membership_id}/role", response_model=MemberResponse)
+async def update_member_role(
+    membership_id: str,
+    data: InviteRequest,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(RequirePermission("projects:write")),
+):
+    pm = await project_service.update_member_role(db, membership_id, data.role)
+    if not pm:
+        raise HTTPException(status_code=404, detail="Membership not found or cannot change owner role")
+    return pm
+
+
+@router.delete("/members/{membership_id}", status_code=204)
+async def remove_member(
+    membership_id: str,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(RequirePermission("projects:write")),
+):
+    removed = await project_service.remove_member(db, membership_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail="Membership not found or cannot remove owner")

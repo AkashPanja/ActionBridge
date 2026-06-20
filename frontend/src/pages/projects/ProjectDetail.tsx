@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { FileType, Inbox, Key, LayoutDashboard } from "lucide-react";
+import { FileType, Inbox, Key, LayoutDashboard, Users } from "lucide-react";
 import { useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { AnimatedPage } from "../../components/shared/AnimatedPage";
@@ -10,6 +10,7 @@ import { can } from "../../lib/rbac";
 import { ApiKeys } from "../ApiKeys";
 import { DocumentInbox } from "../documents/DocumentInbox";
 import { DocumentTypeList } from "../document-types/DocumentTypeList";
+import { MembersPage } from "../MembersPage";
 import { ProjectDashboard } from "../ProjectDashboard";
 
 export function ProjectDetail() {
@@ -23,6 +24,7 @@ export function ProjectDetail() {
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "documents", label: "Documents", icon: Inbox },
     { id: "document-types", label: "Document Types", icon: FileType },
+    { id: "members", label: "Members", icon: Users },
     ...(user && can(user.role, "api_keys:manage")
       ? [{ id: "api-keys", label: "API Keys", icon: Key }]
       : []),
@@ -69,6 +71,8 @@ export function ProjectDetail() {
             <DocumentInbox projectId={projectId!} />
           ) : activeTab === "document-types" ? (
             <DocumentTypeList projectId={projectId} />
+          ) : activeTab === "members" ? (
+            <MembersPage projectId={projectId!} />
           ) : (
             <ApiKeys />
           )}

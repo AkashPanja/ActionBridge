@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
-import { ArrowLeft, CheckCircle2, History, Plus, XCircle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ArrowLeft, CheckCircle2, History, Link, MessageSquare, Paperclip, Plus, Send, Trash2, XCircle } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -8,10 +8,13 @@ import { Card } from "../../components/ui/Card";
 import { Input } from "../../components/ui/Input";
 import { Skeleton } from "../../components/ui/Skeleton";
 import { AnimatedPage } from "../../components/shared/AnimatedPage";
+import { useAuth } from "../../contexts/AuthContext";
 import { useDocument, useUpdateDocument } from "../../hooks/useDocuments";
 import { useDocumentType } from "../../hooks/useDocumentTypes";
 import { formatDate } from "../../lib/utils";
 import type { AuditEvent } from "../../types";
+
+const API_BASE = "/api/v1";
 
 const statusColors: Record<string, string> = {
   received: "bg-surface-100 text-surface-700 dark:bg-surface-700 dark:text-surface-300",
@@ -19,6 +22,26 @@ const statusColors: Record<string, string> = {
   approved: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
   rejected: "bg-accent-100 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300",
 };
+
+interface Comment {
+  id: string;
+  document_id: string;
+  user_id: string;
+  parent_id: string | null;
+  content: string;
+  created_at: string;
+  updated_at: string;
+  author_name: string;
+  replies: Comment[];
+}
+
+interface Attachment {
+  id: string;
+  file_name: string;
+  mime_type: string;
+  file_size: number;
+  created_at: string;
+}
 
 function confidenceColor(score: number | undefined): string {
   if (score == null) return "border-surface-200 dark:border-surface-600";
@@ -84,6 +107,203 @@ function AuditTimeline({ events }: { events: AuditEvent[] }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function CommentsSection({ projectId, documentId }: { projectId: string; documentId: string }) {
+  const { token, user } = useAuth();
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [newComment, setNewComment] = useState("");
+  const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  async function fetchComments() {
+    try {
+      const res = await fetch(`${API_BASE}/projects/${projectId}/documents/${documentId}/comments`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) setComments(await res.json());
+    } catch { /* ignore */ }
+    setLoading(false);
+  }
+
+  useEffect(() => { fetchComments(); }, [projectId, documentId]);
+
+  async function addComment() {
+    if (!newComment.trim()) return;
+    await fetch(`${API_BASE}/projects/${projectId}/documents/${documentId}/comments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ content: newComment }),
+    });
+    setNewComment("");
+    fetchComments();
+  }
+
+  async function addReply(parentId: string) {
+    if (!replyText.trim()) return;
+    await fetch(`${API_BASE}/projects/${projectId}/documents/${documentId}/comments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ content: replyText, parent_id: parentId }),
+    });
+    setReplyText("");
+    setReplyTo(null);
+    fetchComments();
+  }
+
+  async function deleteComment(commentId: string) {
+    await fetch(`${API_BASE}/projects/${projectId}/documents/${documentId}/comments/${commentId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    fetchComments();
+  }
+
+  if (loading) return <Skeleton className="h-32 w-full" />;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <MessageSquare className="h-4 w-4 text-surface-400" />
+        <h3 className="text-sm font-semibold text-surface-900 dark:text-surface-100">Comments</h3>
+      </div>
+
+      <div className="flex gap-2">
+        <input
+          value={newComment}
+          onChange={(e) => setNewComment(e.target.value)}
+          placeholder="Add a comment..."
+          onKeyDown={(e) => e.key === "Enter" && addComment()}
+          className="flex-1 rounded-lg border border-surface-300 bg-white px-3 py-2 text-sm focus:border-accent-500 focus:outline-none dark:border-surface-600 dark:bg-surface-800 dark:text-surface-100"
+        />
+        <Button size="sm" onClick={addComment} disabled={!newComment.trim()}>
+          <Send className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+
+      <div className="space-y-3">
+        {comments.length === 0 && <p className="text-sm text-surface-400">No comments yet.</p>}
+        {comments.map((c) => (
+          <div key={c.id}>
+            <div className="rounded-lg bg-surface-50 p-3 dark:bg-surface-800">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-surface-700 dark:text-surface-300">{c.author_name}</span>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setReplyTo(replyTo === c.id ? null : c.id)} className="text-[10px] text-accent-500 hover:text-accent-600">
+                    Reply
+                  </button>
+                  {(c.user_id === user?.id) && (
+                    <button onClick={() => deleteComment(c.id)} className="text-[10px] text-accent-400 hover:text-accent-600">
+                      Delete
+                    </button>
+                  )}
+                </div>
+              </div>
+              <p className="mt-1 text-sm text-surface-600 dark:text-surface-300">{c.content}</p>
+            </div>
+
+            {replyTo === c.id && (
+              <div className="ml-6 mt-2 flex gap-2">
+                <input
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  placeholder="Write a reply..."
+                  onKeyDown={(e) => e.key === "Enter" && addReply(c.id)}
+                  className="flex-1 rounded-lg border border-surface-300 bg-white px-3 py-1.5 text-xs focus:border-accent-500 focus:outline-none dark:border-surface-600 dark:bg-surface-800 dark:text-surface-100"
+                />
+                <button onClick={() => addReply(c.id)} className="rounded-lg bg-accent-500 px-2 py-1.5 text-xs text-white hover:bg-accent-600">
+                  Reply
+                </button>
+              </div>
+            )}
+
+            {c.replies?.map((r) => (
+              <div key={r.id} className="ml-6 mt-2 rounded-lg bg-surface-50/50 p-3 dark:bg-surface-800/50">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-surface-600 dark:text-surface-400">{r.author_name}</span>
+                  {(r.user_id === user?.id) && (
+                    <button onClick={() => deleteComment(r.id)} className="text-[10px] text-accent-400 hover:text-accent-600">
+                      Delete
+                    </button>
+                  )}
+                </div>
+                <p className="mt-1 text-sm text-surface-600 dark:text-surface-300">{r.content}</p>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AttachmentsSection({ projectId, documentId }: { projectId: string; documentId: string }) {
+  const { token } = useAuth();
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function fetchAttachments() {
+    try {
+      const res = await fetch(`${API_BASE}/attachments/${documentId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) setAttachments(await res.json());
+    } catch { /* ignore */ }
+  }
+
+  useEffect(() => { fetchAttachments(); }, [documentId]);
+
+  async function uploadFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      await fetch(`${API_BASE}/attachments/${documentId}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      fetchAttachments();
+    } catch { /* ignore */ }
+    setUploading(false);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  function formatSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <Paperclip className="h-4 w-4 text-surface-400" />
+        <h3 className="text-sm font-semibold text-surface-900 dark:text-surface-100">Attachments</h3>
+        <label className="ml-auto cursor-pointer rounded-lg bg-surface-100 px-3 py-1.5 text-xs font-medium text-surface-600 transition-colors hover:bg-surface-200 dark:bg-surface-700 dark:text-surface-400 dark:hover:bg-surface-600">
+          {uploading ? "Uploading..." : "Upload"}
+          <input ref={fileRef} type="file" className="hidden" onChange={uploadFile} />
+        </label>
+      </div>
+      {attachments.length === 0 ? (
+        <p className="text-sm text-surface-400">No attachments.</p>
+      ) : (
+        <div className="space-y-1.5">
+          {attachments.map((a) => (
+            <div key={a.id} className="flex items-center gap-2 rounded-lg bg-surface-50 px-3 py-2 dark:bg-surface-800">
+              <Paperclip className="h-3.5 w-3.5 shrink-0 text-surface-400" />
+              <span className="flex-1 truncate text-sm text-surface-700 dark:text-surface-300">{a.file_name}</span>
+              <span className="shrink-0 text-[10px] text-surface-400">{formatSize(a.file_size)}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -269,7 +489,7 @@ export function DocumentDetail() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 space-y-6">
           <Card className="space-y-4">
             <h2 className="text-sm font-semibold text-surface-900 dark:text-surface-100">Extracted Data</h2>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -533,9 +753,13 @@ export function DocumentDetail() {
               </div>
             ) : null}
           </Card>
+
+          <Card>
+            <CommentsSection projectId={projectId!} documentId={docId!} />
+          </Card>
         </div>
 
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 space-y-4">
           <Card>
             <div className="mb-4 flex items-center gap-2">
               <History className="h-4 w-4 text-surface-400" />
@@ -546,6 +770,10 @@ export function DocumentDetail() {
             ) : (
               <p className="py-8 text-center text-sm text-surface-400">No history yet</p>
             )}
+          </Card>
+
+          <Card>
+            <AttachmentsSection projectId={projectId!} documentId={docId!} />
           </Card>
         </div>
       </div>
