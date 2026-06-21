@@ -40,6 +40,7 @@ interface Attachment {
   file_name: string;
   mime_type: string;
   file_size: number;
+  url: string;
   created_at: string;
 }
 
@@ -298,7 +299,7 @@ function AttachmentsSection({ projectId, documentId }: { projectId: string; docu
           {attachments.map((a) => (
             <div key={a.id} className="flex items-center gap-2 rounded-lg bg-surface-50 px-3 py-2 dark:bg-surface-800">
               <Paperclip className="h-3.5 w-3.5 shrink-0 text-surface-400" />
-              <span className="flex-1 truncate text-sm text-surface-700 dark:text-surface-300">{a.file_name}</span>
+              <a href={a.url} target="_blank" rel="noopener noreferrer" className="flex-1 truncate text-sm text-accent-600 hover:text-accent-700 underline dark:text-accent-400 dark:hover:text-accent-300">{a.file_name}</a>
               <span className="shrink-0 text-[10px] text-surface-400">{formatSize(a.file_size)}</span>
             </div>
           ))}

@@ -331,3 +331,36 @@ async def list_pending_invitations(db: AsyncSession, user_id: str) -> list[dict]
         }
         for pm, pname in result.all()
     ]
+
+
+async def get_recent_activity(db: AsyncSession, project_id: str, limit: int = 10) -> list[dict]:
+    result = await db.execute(
+        select(
+            AuditEvent.id,
+            AuditEvent.action,
+            AuditEvent.actor,
+            AuditEvent.comment,
+            AuditEvent.timestamp,
+            DocumentInstance.document_type_id,
+            DocumentType.name.label("document_type_name"),
+        )
+        .join(DocumentInstance, AuditEvent.document_id == DocumentInstance.id)
+        .join(DocumentType, DocumentInstance.document_type_id == DocumentType.id)
+        .where(
+            DocumentInstance.project_id == project_id,
+            DocumentInstance.is_deleted == False,
+        )
+        .order_by(AuditEvent.timestamp.desc())
+        .limit(limit)
+    )
+    return [
+        {
+            "id": row.id,
+            "action": row.action,
+            "actor": row.actor,
+            "comment": row.comment,
+            "timestamp": row.timestamp,
+            "document_type_name": row.document_type_name,
+        }
+        for row in result.all()
+    ]

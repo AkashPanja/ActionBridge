@@ -1,14 +1,36 @@
-import { FileCode, FolderKanban, GitCompareArrows, LogOut, Plus, Settings, Users, Key } from "lucide-react";
+import { Bell, FileCode, FolderKanban, GitCompareArrows, LogOut, Plus, Settings, Users } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { useProjects } from "../../hooks/useProjects";
 import { can } from "../../lib/rbac";
 import { cn } from "../../lib/utils";
- 
+
+const API_BASE = "/api/v1";
+
 export function Sidebar() {
   const { projectId } = useParams();
   const { data: projects } = useProjects();
-  const { user, logout } = useAuth();
+  const { user, logout, token } = useAuth();
+  const [pendingInvites, setPendingInvites] = useState(0);
+
+  useEffect(() => {
+    if (!token) return;
+    async function fetchInvites() {
+      try {
+        const res = await fetch(`${API_BASE}/invitations`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setPendingInvites(data.length);
+        }
+      } catch { /* ignore */ }
+    }
+    fetchInvites();
+    const interval = setInterval(fetchInvites, 30000);
+    return () => clearInterval(interval);
+  }, [token]);
 
   return (
     <aside className="flex h-full w-64 flex-col border-r border-surface-200/60 bg-white/50 backdrop-blur-xl dark:border-surface-700/50 dark:bg-surface-900/50">
@@ -85,10 +107,18 @@ export function Sidebar() {
         {user ? (
           <div className="rounded-xl bg-surface-100/50 px-3 py-2 dark:bg-surface-700/30">
             <div className="flex items-center justify-between">
-              <div className="min-w-0">
-                <p className="truncate text-xs font-medium text-surface-700 dark:text-surface-200">
-                  {user.name}
-                </p>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="truncate text-xs font-medium text-surface-700 dark:text-surface-200">
+                    {user.name}
+                  </p>
+                  {pendingInvites > 0 && (
+                    <span className="flex items-center gap-1 rounded-full bg-accent-100 px-2 py-0.5 text-[9px] font-medium text-accent-600 dark:bg-accent-900/30 dark:text-accent-400">
+                      <Bell className="h-2.5 w-2.5" />
+                      {pendingInvites}
+                    </span>
+                  )}
+                </div>
                 <p className="truncate text-xs text-surface-400 capitalize">{user.role}</p>
               </div>
               <button

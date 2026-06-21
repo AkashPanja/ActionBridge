@@ -67,6 +67,15 @@ async def update_project(
     return project
 
 
+@router.get("/{project_id}/recent-activity")
+async def get_recent_activity(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_active_user),
+):
+    return await project_service.get_recent_activity(db, project_id)
+
+
 @router.get("/{project_id}/stats", response_model=ProjectStats)
 async def get_project_stats(
     project_id: str,

@@ -1,4 +1,5 @@
 import { Navigate, useLocation } from "react-router-dom";
+import { ErrorBoundary } from "../shared/ErrorBoundary";
 import { useAuth } from "../../contexts/AuthContext";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -21,5 +22,5 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  return <>{children}</>;
+  return <ErrorBoundary>{children}</ErrorBoundary>;
 }
