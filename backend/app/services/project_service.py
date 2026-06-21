@@ -141,7 +141,7 @@ async def get_project_stats(db: AsyncSession, project_id: str) -> dict:
     )
     by_document_type = [{"name": row.name, "count": row.cnt} for row in type_rows]
 
-    seven_days_ago = datetime.now(timezone.utc) - timedelta(days=6)
+    seven_days_ago = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=6)
     daily_rows = await db.execute(
         select(
             func.date(DocumentInstance.created_at).label("date"),
@@ -154,7 +154,7 @@ async def get_project_stats(db: AsyncSession, project_id: str) -> dict:
             DocumentInstance.created_at >= seven_days_ago,
         )
         .group_by(func.date(DocumentInstance.created_at), DocumentInstance.status)
-        .order_by("date")
+        .order_by(func.date(DocumentInstance.created_at))
     )
     daily_volume = [
         {"date": str(row.date), "status": row.status, "count": row.cnt}

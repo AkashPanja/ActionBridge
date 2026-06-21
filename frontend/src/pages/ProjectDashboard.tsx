@@ -113,19 +113,29 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
   const approved = findCount("approved");
   const rejected = findCount("rejected");
 
-  // Prepare data for line chart: aggregate daily volume by date
+  // Prepare data for line chart: fill all 7 days, zero for missing
   const dateMap = new Map<string, Record<string, number>>();
   for (const d of stats.daily_volume) {
     if (!dateMap.has(d.date)) dateMap.set(d.date, {});
     dateMap.get(d.date)![d.status] = (dateMap.get(d.date)![d.status] ?? 0) + d.count;
   }
-  const lineChartData = [...dateMap.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, counts]) => ({
-    date: date.slice(5),
-    received: counts.received ?? 0,
-    pending_review: counts.pending_review ?? 0,
-    approved: counts.approved ?? 0,
-    rejected: counts.rejected ?? 0,
-  }));
+  // Build 7-day range
+  const allStatusKeys = ["received", "pending_review", "approved", "rejected"];
+  const today = new Date();
+  const lineChartData: { date: string; received: number; pending_review: number; approved: number; rejected: number }[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    const counts = dateMap.get(key) ?? {};
+    lineChartData.push({
+      date: key.slice(5),
+      received: counts.received ?? 0,
+      pending_review: counts.pending_review ?? 0,
+      approved: counts.approved ?? 0,
+      rejected: counts.rejected ?? 0,
+    });
+  }
 
   // Pie chart data
   const pieData = stats.status_breakdown.map((b) => ({
