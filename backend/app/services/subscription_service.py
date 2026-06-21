@@ -14,7 +14,7 @@ async def list_subscriptions(db: AsyncSession, user_id: str) -> list[DocTypeSubs
 
 
 async def set_subscription(
-    db: AsyncSession, user_id: str, document_type_id: str, notify_on: list[str]
+    db: AsyncSession, user_id: str, project_id: str, document_type_id: str, notify_on: list[str]
 ) -> DocTypeSubscription:
     result = await db.execute(
         select(DocTypeSubscription).where(
@@ -28,6 +28,7 @@ async def set_subscription(
     else:
         sub = DocTypeSubscription(
             user_id=user_id,
+            project_id=project_id,
             document_type_id=document_type_id,
             notify_on=notify_on,
         )

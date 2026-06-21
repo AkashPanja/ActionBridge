@@ -1,0 +1,161 @@
+import asyncio
+import os
+from typing import AsyncGenerator
+
+import pytest
+import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
+
+os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///./test.db"
+os.environ["SECRET_KEY"] = "test-secret-key-for-testing-only"
+
+from app.database import AsyncSessionLocal, engine
+from app.main import app
+from app.models import Base
+from app.auth.models import User
+from app.auth.service import create_access_token, hash_password
+
+TEST_SETUP_FILE = ".test-setup-complete"
+
+
+@pytest.fixture(scope="session")
+def event_loop():
+    loop = asyncio.new_event_loop()
+    yield loop
+    loop.close()
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def setup_db():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield
+    async with engine.begin() as conn:
+        if "sqlite" in str(engine.url):
+            await conn.execute(text("PRAGMA foreign_keys=OFF"))
+        await conn.run_sync(Base.metadata.drop_all)
+        if "sqlite" in str(engine.url):
+            await conn.execute(text("PRAGMA foreign_keys=ON"))
+
+
+@pytest_asyncio.fixture
+async def client() -> AsyncGenerator:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
+
+
+@pytest_asyncio.fixture
+async def db_session() -> AsyncGenerator:
+    async with AsyncSessionLocal() as session:
+        yield session
+
+
+@pytest_asyncio.fixture
+async def setup_complete():
+    from app.config import settings
+    original = settings.setup_complete_file
+    settings.setup_complete_file = TEST_SETUP_FILE
+    open(TEST_SETUP_FILE, "w").close()
+    yield
+    settings.setup_complete_file = original
+    if os.path.exists(TEST_SETUP_FILE):
+        os.remove(TEST_SETUP_FILE)
+
+
+@pytest_asyncio.fixture
+async def admin_user(db_session) -> User:
+    user = User(
+        email="admin@test.com",
+        password_hash=hash_password("admin123"),
+        name="Admin User",
+        role="admin",
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture
+async def admin_token(admin_user) -> str:
+    return create_access_token({
+        "sub": admin_user.id,
+        "role": admin_user.role,
+        "email": admin_user.email,
+    })
+
+
+@pytest_asyncio.fixture
+async def admin_headers(admin_token) -> dict:
+    return {"Authorization": f"Bearer {admin_token}"}
+
+
+@pytest_asyncio.fixture
+async def reviewer_user(db_session) -> User:
+    user = User(
+        email="reviewer@test.com",
+        password_hash=hash_password("reviewer123"),
+        name="Reviewer User",
+        role="reviewer",
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture
+async def reviewer_token(reviewer_user) -> str:
+    return create_access_token({
+        "sub": reviewer_user.id,
+        "role": reviewer_user.role,
+        "email": reviewer_user.email,
+    })
+
+
+@pytest_asyncio.fixture
+async def reviewer_headers(reviewer_token) -> dict:
+    return {"Authorization": f"Bearer {reviewer_token}"}
+
+
+@pytest_asyncio.fixture
+async def viewer_user(db_session) -> User:
+    user = User(
+        email="viewer@test.com",
+        password_hash=hash_password("viewer123"),
+        name="Viewer User",
+        role="viewer",
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture
+async def viewer_token(viewer_user) -> str:
+    return create_access_token({
+        "sub": viewer_user.id,
+        "role": viewer_user.role,
+        "email": viewer_user.email,
+    })
+
+
+@pytest_asyncio.fixture
+async def viewer_headers(viewer_token) -> dict:
+    return {"Authorization": f"Bearer {viewer_token}"}
+
+
+@pytest_asyncio.fixture
+async def setup_required():
+    from app.config import settings
+    original = settings.setup_complete_file
+    settings.setup_complete_file = TEST_SETUP_FILE
+    if os.path.exists(TEST_SETUP_FILE):
+        os.remove(TEST_SETUP_FILE)
+    yield
+    settings.setup_complete_file = original
+    if os.path.exists(TEST_SETUP_FILE):
+        os.remove(TEST_SETUP_FILE)

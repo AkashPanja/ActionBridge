@@ -14,6 +14,7 @@ router = APIRouter(prefix="/api/v1/subscriptions", tags=["Subscriptions"])
 
 
 class SubscriptionSet(BaseModel):
+    project_id: str
     document_type_id: str
     notify_on: list[str]
 
@@ -33,7 +34,7 @@ async def upsert_subscription(
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_active_user),
 ):
-    sub = await set_subscription(db, user.id, data.document_type_id, data.notify_on)
+    sub = await set_subscription(db, user.id, data.project_id, data.document_type_id, data.notify_on)
     return sub
 
 
