@@ -14,7 +14,8 @@ from app.models.document_instance import DocumentInstance
 
 router = APIRouter(prefix="/api/v1/attachments", tags=["Attachments"])
 
-UPLOAD_DIR = Path(settings.upload_dir) / "attachments"
+RELATIVE_DIR = "attachments"
+UPLOAD_DIR = Path(settings.upload_dir) / RELATIVE_DIR
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
@@ -57,15 +58,14 @@ async def upload_attachment(
 
     ext = Path(file.filename).suffix if file.filename else ""
     stored_name = f"{uuid.uuid4()}{ext}"
-    file_path = UPLOAD_DIR / stored_name
 
-    with open(file_path, "wb") as f:
+    with open(UPLOAD_DIR / stored_name, "wb") as f:
         f.write(content)
 
     attachment = DocumentAttachment(
         document_id=document_id,
         file_name=file.filename or stored_name,
-        file_path=str(file_path),
+        file_path=f"{RELATIVE_DIR}/{stored_name}",
         mime_type=file.content_type or "application/octet-stream",
         file_size=len(content),
     )
@@ -73,12 +73,19 @@ async def upload_attachment(
     await db.commit()
     await db.refresh(attachment)
 
+    return _format_attachment(attachment)
+
+
+def _format_attachment(att: DocumentAttachment) -> dict:
     return {
-        "id": attachment.id,
-        "file_name": attachment.file_name,
-        "mime_type": attachment.mime_type,
-        "file_size": attachment.file_size,
-        "created_at": attachment.created_at,
+        "id": att.id,
+        "document_id": att.document_id,
+        "file_name": att.file_name,
+        "file_path": att.file_path,
+        "mime_type": att.mime_type,
+        "file_size": att.file_size,
+        "url": f"/uploads/{att.file_path}",
+        "created_at": att.created_at.isoformat() if att.created_at else None,
     }
 
 
@@ -93,7 +100,7 @@ async def list_attachments(
         .where(DocumentAttachment.document_id == document_id)
         .order_by(DocumentAttachment.created_at.desc())
     )
-    return result.scalars().all()
+    return [_format_attachment(a) for a in result.scalars().all()]
 
 
 @router.delete("/{attachment_id}", status_code=204)
@@ -108,8 +115,9 @@ async def delete_attachment(
     att = result.scalar_one_or_none()
     if not att:
         raise HTTPException(status_code=404, detail="Attachment not found")
+    full_path = Path(settings.upload_dir) / att.file_path
     try:
-        os.remove(att.file_path)
+        os.remove(str(full_path))
     except OSError:
         pass
     await db.delete(att)

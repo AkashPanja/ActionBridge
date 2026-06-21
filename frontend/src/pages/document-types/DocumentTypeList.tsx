@@ -1,10 +1,11 @@
 import { motion } from "framer-motion";
-import { FileType, Pencil, Plus, ShieldCheck, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Bell, FileType, Pencil, Plus, ShieldCheck, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { can } from "../../lib/rbac";
 import { Badge } from "../../components/ui/Badge";
+import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { CardSkeleton } from "../../components/ui/Skeleton";
 import { EmptyState } from "../../components/ui/EmptyState";
@@ -13,6 +14,8 @@ import { formatDate } from "../../lib/utils";
 import { ValidationRulesDialog } from "../../components/schema/ValidationRulesDialog";
 import { DocumentTypeCreateDialog } from "./DocumentTypeCreate";
 import { DocumentTypeEditDialog } from "./DocumentTypeEdit";
+
+const API_BASE = "/api/v1";
 
 const container = {
   hidden: { opacity: 0 },
@@ -35,13 +38,50 @@ export function DocumentTypeList({ projectId: propProjectId }: Props) {
   const params = useParams<{ projectId: string }>();
   const projectId = propProjectId ?? params.projectId!;
   const { data: docTypes, isLoading } = useDocumentTypes(projectId);
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const deleteDocType = useDeleteDocumentType(projectId);
   const bulkDelete = useBulkDeleteDocumentTypes(projectId);
   const [createOpen, setCreateOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editingDocType, setEditingDocType] = useState<{ id: string; name: string; schema_definition: Record<string, unknown>; validation_rules?: Record<string, unknown> | null } | null>(null);
   const [rulesDocType, setRulesDocType] = useState<{ id: string; name: string; schema_definition: Record<string, unknown>; validation_rules?: Record<string, unknown> | null } | null>(null);
+  const [subscriptions, setSubscriptions] = useState<Record<string, string[]>>({});
+  const [subLoading, setSubLoading] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    async function loadSubs() {
+      try {
+        const res = await fetch(`${API_BASE}/subscriptions`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const map: Record<string, string[]> = {};
+          data.forEach((s: { document_type_id: string; notify_on: string[] }) => {
+            map[s.document_type_id] = s.notify_on;
+          });
+          setSubscriptions(map);
+        }
+      } catch { /* ignore */ }
+    }
+    loadSubs();
+  }, [token]);
+
+  async function toggleSubscription(docTypeId: string, event: React.MouseEvent) {
+    event.stopPropagation();
+    if (!token) return;
+    const current = subscriptions[docTypeId] ?? [];
+    const notifyOn = current.length > 0 ? [] : ["pending_review", "rejected"];
+    try {
+      await fetch(`${API_BASE}/subscriptions`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ document_type_id: docTypeId, notify_on: notifyOn }),
+      });
+      setSubscriptions((prev) => ({ ...prev, [docTypeId]: notifyOn }));
+    } catch { /* ignore */ }
+  }
 
   const canWrite = user && can(user.role, "document_types:write");
 
@@ -136,6 +176,18 @@ export function DocumentTypeList({ projectId: propProjectId }: Props) {
                           className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-surface-400 transition-all hover:bg-emerald-50 hover:text-emerald-500 dark:hover:bg-emerald-900/20"
                         >
                           <ShieldCheck className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={(e) => toggleSubscription(dt.id, e)}
+                          disabled={subLoading}
+                          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all ${
+                            subscriptions[dt.id]?.length
+                              ? "text-brand-500 hover:bg-brand-500 hover:bg-brand-50 hover:text-brand-600"
+                              : "text-surface-400 hover:bg-amber-50 hover:text-amber-500"
+                          }`}
+                          title={subscriptions[dt.id]?.length ? "Unsubscribe from notifications" : "Subscribe to notifications"}
+                        >
+                          <Bell className="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={() => {

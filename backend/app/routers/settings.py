@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.deps import RequirePermission
 from app.auth.service import get_setting, save_setting
 from app.database import get_db
+from app.services.email_service import send_email
 from app.schemas.settings import CompanySettings, PasswordPolicy, SettingsResponse, SettingsUpdate, SmtpConfig
 
 router = APIRouter(prefix="/api/v1/settings", tags=["Settings"])
@@ -49,3 +50,21 @@ async def upload_logo(file: UploadFile = File(...), db: AsyncSession = Depends(g
     existing["logo"] = data_uri
     await save_setting(db, "company", existing)
     return {"logo": data_uri}
+
+
+@router.post("/test-email", status_code=200)
+async def send_test_email(
+    db: AsyncSession = Depends(get_db), user=Depends(RequirePermission("settings:write"))
+):
+    smtp = await get_setting(db, "smtp")
+    if not smtp or not smtp.get("host"):
+        raise HTTPException(status_code=400, detail="SMTP not configured")
+    company = await get_setting(db, "company") or DEFAULTS["company"]
+    await send_email(
+        db,
+        to=user.email,
+        subject="Test Email from Action Bridge",
+        template="document_approved",  # reuse existing template
+        context={"company_name": company.get("name", "Action Bridge")},
+    )
+    return {"message": "Test email sent"}

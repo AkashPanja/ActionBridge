@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
-import { GitCompareArrows } from "lucide-react";
+import { GitCompareArrows, Link as LinkIcon } from "lucide-react";
 import { useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { useAuth } from "../../contexts/AuthContext";
@@ -94,6 +94,13 @@ export function LoginPage() {
               Sign In
             </Button>
           </form>
+
+          <p className="mt-4 text-center text-sm text-surface-500">
+            <Link to="/forgot-password" className="flex items-center justify-center gap-1 text-accent-500 hover:text-accent-600">
+              <LinkIcon className="h-3.5 w-3.5" />
+              Forgot password?
+            </Link>
+          </p>
 
         </div>
       </motion.div>

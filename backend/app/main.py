@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.database import AsyncSessionLocal, engine
@@ -50,6 +51,12 @@ app.include_router(comments.router)
 app.include_router(invitations.router)
 app.include_router(subscriptions.router)
 app.include_router(attachments.router)
+
+# Serve uploaded files
+import os
+uploads_path = os.path.abspath(settings.upload_dir)
+os.makedirs(uploads_path, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=uploads_path), name="uploads")
 
 
 @app.get("/health")

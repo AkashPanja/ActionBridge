@@ -1,4 +1,4 @@
-import { AlertTriangle, Building2, KeyRound, Mail, Save, Trash2, Upload } from "lucide-react";
+import { AlertTriangle, Building2, KeyRound, Mail, Save, Send, Trash2, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/Button";
@@ -106,6 +106,23 @@ export function SettingsPage() {
       setSuccess("Settings saved successfully.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
+    }
+    setSaving(false);
+  }
+
+  async function sendTestEmail() {
+    setSaving(true);
+    setError("");
+    setSuccess("");
+    try {
+      const res = await fetch(`${API_BASE}/settings/test-email`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({ detail: "Failed" }))).detail);
+      setSuccess("Test email sent!");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send test email");
     }
     setSaving(false);
   }
@@ -284,9 +301,14 @@ export function SettingsPage() {
               />
               <span className="text-sm text-surface-700 dark:text-surface-300">Use TLS</span>
             </label>
-            <Button onClick={saveSettings} isLoading={saving}>
-              <Save className="h-4 w-4" /> Save SMTP Settings
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={saveSettings} isLoading={saving}>
+                <Save className="h-4 w-4" /> Save SMTP Settings
+              </Button>
+              <Button variant="outline" onClick={sendTestEmail} isLoading={saving} disabled={!settings.smtp.host}>
+                <Send className="h-4 w-4" /> Send Test Email
+              </Button>
+            </div>
           </div>
         </Card>
       )}
