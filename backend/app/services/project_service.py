@@ -3,6 +3,8 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import case, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
+
 from app.auth.models import User
 from app.models.audit_event import AuditEvent
 from app.models.document_instance import DocumentInstance
@@ -141,7 +143,10 @@ async def get_project_stats(db: AsyncSession, project_id: str) -> dict:
     )
     by_document_type = [{"name": row.name, "count": row.cnt} for row in type_rows]
 
-    seven_days_ago = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=6)
+    if settings.is_postgres:
+        seven_days_ago = datetime.now(timezone.utc) - timedelta(days=6)
+    else:
+        seven_days_ago = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=6)
     daily_rows = await db.execute(
         select(
             func.date(DocumentInstance.created_at).label("date"),
