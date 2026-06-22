@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Bell, FileType, Pencil, Plus, ShieldCheck, Trash2 } from "lucide-react";
+import { Bell, Copy, FileType, Pencil, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
@@ -9,7 +9,7 @@ import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { CardSkeleton } from "../../components/ui/Skeleton";
 import { EmptyState } from "../../components/ui/EmptyState";
-import { useBulkDeleteDocumentTypes, useDeleteDocumentType, useDocumentTypes } from "../../hooks/useDocumentTypes";
+import { useBulkDeleteDocumentTypes, useCloneDocumentType, useDeleteDocumentType, useDocumentTypes } from "../../hooks/useDocumentTypes";
 import { formatDate } from "../../lib/utils";
 import { ValidationRulesDialog } from "../../components/schema/ValidationRulesDialog";
 import { DocumentTypeCreateDialog } from "./DocumentTypeCreate";
@@ -41,6 +41,7 @@ export function DocumentTypeList({ projectId: propProjectId }: Props) {
   const { user, token } = useAuth();
   const deleteDocType = useDeleteDocumentType(projectId);
   const bulkDelete = useBulkDeleteDocumentTypes(projectId);
+  const cloneDocType = useCloneDocumentType(projectId);
   const [createOpen, setCreateOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editingDocType, setEditingDocType] = useState<{ id: string; name: string; schema_definition: Record<string, unknown>; validation_rules?: Record<string, unknown> | null } | null>(null);
@@ -170,6 +171,16 @@ export function DocumentTypeList({ projectId: propProjectId }: Props) {
                           className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-surface-400 transition-all hover:bg-brand-50 hover:text-brand-500 dark:hover:bg-brand-900/20"
                         >
                           <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            const name = prompt("Name for cloned document type:", `${dt.name} (Copy)`);
+                            if (name) cloneDocType.mutate({ typeId: dt.id, name });
+                          }}
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-surface-400 transition-all hover:bg-violet-50 hover:text-violet-500 dark:hover:bg-violet-900/20"
+                          title="Clone"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={() => setRulesDocType({ id: dt.id, name: dt.name, schema_definition: dt.schema_definition, validation_rules: dt.validation_rules })}

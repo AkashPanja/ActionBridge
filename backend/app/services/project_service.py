@@ -38,7 +38,7 @@ async def create_project(
         membership = ProjectMembership(
             project_id=project.id,
             user_id=user_id,
-            role="owner",
+            access_level="owner",
             status="accepted",
         )
         db.add(membership)
@@ -208,7 +208,7 @@ async def list_members(db: AsyncSession, project_id: str) -> list[dict]:
             "id": pm.id,
             "project_id": pm.project_id,
             "user_id": pm.user_id,
-            "role": pm.role,
+            "role": pm.access_level,
             "status": pm.status,
             "invited_by": pm.invited_by,
             "user_name": uname,
@@ -233,7 +233,7 @@ async def invite_member(
     pm = ProjectMembership(
         project_id=project_id,
         user_id=invitee_id,
-        role=role,
+        access_level=role,
         status="pending",
         invited_by=inviter_id,
     )
@@ -290,12 +290,19 @@ async def decline_invitation(db: AsyncSession, membership_id: str, user_id: str)
     return True
 
 
+async def get_membership_by_id(db: AsyncSession, membership_id: str) -> ProjectMembership | None:
+    result = await db.execute(
+        select(ProjectMembership).where(ProjectMembership.id == membership_id)
+    )
+    return result.scalar_one_or_none()
+
+
 async def remove_member(db: AsyncSession, membership_id: str) -> bool:
     result = await db.execute(
         select(ProjectMembership).where(ProjectMembership.id == membership_id)
     )
     pm = result.scalar_one_or_none()
-    if not pm or pm.role == "owner":
+    if not pm or pm.access_level == "owner":
         return False
     await db.delete(pm)
     await db.commit()
@@ -307,9 +314,9 @@ async def update_member_role(db: AsyncSession, membership_id: str, role: str) ->
         select(ProjectMembership).where(ProjectMembership.id == membership_id)
     )
     pm = result.scalar_one_or_none()
-    if not pm or pm.role == "owner":
+    if not pm or pm.access_level == "owner":
         return None
-    pm.role = role
+    pm.access_level = role
     await db.commit()
     await db.refresh(pm)
     return pm

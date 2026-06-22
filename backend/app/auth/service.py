@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import ApiKey, User
 from app.auth.schemas import CreateUserRequest, RegisterRequest, SetupRequest
+from app.models.api_key_scope import ApiKeyProjectScope
 from app.config import settings
 from app.models.audit_event import AuditEvent
 from app.models.document_instance import DocumentInstance
@@ -90,6 +91,7 @@ async def create_api_key(
     label: str,
     scopes: list[str] | None = None,
     expires_in_days: int | None = None,
+    project_ids: list[str] | None = None,
 ) -> tuple[ApiKey, str]:
     raw_key, key_hash, key_prefix = generate_api_key()
     api_key = ApiKey(
@@ -105,6 +107,13 @@ async def create_api_key(
         ),
     )
     db.add(api_key)
+    await db.flush()
+
+    target_projects = project_ids or [project_id]
+    for pid in target_projects:
+        scope = ApiKeyProjectScope(api_key_id=api_key.id, project_id=pid)
+        db.add(scope)
+
     await db.commit()
     await db.refresh(api_key)
     return api_key, raw_key
@@ -127,13 +136,31 @@ async def validate_api_key(db: AsyncSession, raw_key: str) -> ApiKey | None:
     return None
 
 
-async def list_api_keys(db: AsyncSession, project_id: str) -> list[ApiKey]:
+async def list_api_keys(db: AsyncSession, project_id: str) -> list[dict]:
     result = await db.execute(
         select(ApiKey)
         .where(ApiKey.project_id == project_id)
         .order_by(ApiKey.created_at.desc())
     )
-    return list(result.scalars().all())
+    keys = list(result.scalars().all())
+    output = []
+    for key in keys:
+        sr = await db.execute(
+            select(ApiKeyProjectScope).where(ApiKeyProjectScope.api_key_id == key.id)
+        )
+        scoped_projects = [s.project_id for s in sr.scalars().all()]
+        output.append({
+            "id": key.id,
+            "project_id": key.project_id,
+            "label": key.label,
+            "key_prefix": key.key_prefix,
+            "scopes": key.scopes,
+            "is_active": key.is_active,
+            "expires_at": key.expires_at,
+            "created_at": key.created_at,
+            "scoped_projects": scoped_projects,
+        })
+    return output
 
 
 async def check_setup_required(db: AsyncSession | None = None) -> bool:

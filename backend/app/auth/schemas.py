@@ -12,7 +12,7 @@ class RegisterRequest(BaseModel):
     email: str
     password: str
     name: str
-    role: str = "reviewer"
+    role: str = "editor"
 
 
 class TokenResponse(BaseModel):
@@ -52,7 +52,7 @@ class CreateUserRequest(BaseModel):
     email: str
     password: str
     name: str
-    role: str = "reviewer"
+    role: str = "editor"
 
 
 class UpdateUserRequest(BaseModel):
@@ -79,6 +79,7 @@ class ApiKeyCreate(BaseModel):
     project_id: str
     label: str
     scopes: list[str] = ["documents:write"]
+    project_ids: list[str] | None = None
 
 
 class ApiKeyResponse(BaseModel):
@@ -92,7 +93,9 @@ class ApiKeyResponse(BaseModel):
     is_active: bool
     expires_at: datetime | None
     created_at: datetime
+    scoped_projects: list[str] = []
 
 
 class ApiKeyCreatedResponse(ApiKeyResponse):
     raw_key: str
+    scoped_projects: list[str] = []

@@ -1,8 +1,14 @@
+import csv
+import io
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.deps import RequirePermission, get_current_active_user, get_current_user_or_api_key
+from app.auth.permissions import RequireProjectPermission, check_project_permission, PROJECT_PERMISSION_MATRIX
 from app.database import get_db
 from app.models.document_type import DocumentType
 from app.schemas.document import (
@@ -25,6 +31,21 @@ async def submit_document(
     db: AsyncSession = Depends(get_db),
     auth = Depends(get_current_user_or_api_key),
 ):
+    is_user = hasattr(auth, "role")
+    if is_user:
+        has_perm = await check_project_permission(db, auth, project_id, "documents:submit", log_admin_bypass=False)
+        if not has_perm:
+            raise HTTPException(status_code=403, detail="Missing project permission: documents:submit")
+    else:
+        from app.models.api_key_scope import ApiKeyProjectScope
+        sr = await db.execute(
+            select(ApiKeyProjectScope).where(
+                ApiKeyProjectScope.api_key_id == auth.id,
+                ApiKeyProjectScope.project_id == project_id,
+            )
+        )
+        if not sr.scalar_one_or_none():
+            raise HTTPException(status_code=403, detail="API key not authorized for this project")
     actor = getattr(auth, "email", "rpa_bot")
     result = await document_service.submit_document(
         db, project_id, type_id, data.extracted_data, data.confidence_scores, actor
@@ -51,7 +72,7 @@ async def list_documents(
     sort_by: str | None = Query(None),
     sort_order: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    user = Depends(RequirePermission("documents:read")),
+    user = Depends(RequireProjectPermission("documents:read")),
 ):
     from datetime import datetime
     parsed_date_from = datetime.fromisoformat(date_from) if date_from else None
@@ -78,7 +99,7 @@ async def get_document(
     document_id: str,
     include_history: bool = Query(False),
     db: AsyncSession = Depends(get_db),
-    user = Depends(RequirePermission("documents:read")),
+    user = Depends(RequireProjectPermission("documents:read")),
 ):
     doc = await document_service.get_document(db, document_id, include_history)
     if not doc or doc.project_id != project_id:
@@ -99,7 +120,7 @@ async def update_document(
     data: DocumentUpdate,
     db: AsyncSession = Depends(get_db),
     actor: str = Query("user"),
-    user = Depends(RequirePermission("documents:write")),
+    user = Depends(RequireProjectPermission("documents:write")),
 ):
     doc = await document_service.get_document(db, document_id)
     if not doc or doc.project_id != project_id:
@@ -118,12 +139,62 @@ async def update_document(
     )
 
 
+@router.get("/export")
+async def export_documents(
+    project_id: str,
+    format: str = Query("csv", regex="^(csv|xlsx)$"),
+    status: str | None = Query(None),
+    document_type_id: str | None = Query(None),
+    search: str | None = Query(None),
+    date_from: str | None = Query(None),
+    date_to: str | None = Query(None),
+    confidence_min: float | None = Query(None),
+    confidence_max: float | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+    user = Depends(RequireProjectPermission("documents:read")),
+):
+    parsed_date_from = datetime.fromisoformat(date_from) if date_from else None
+    parsed_date_to = datetime.fromisoformat(date_to) if date_to else None
+    headers, rows = await document_service.export_documents(
+        db, project_id, format, status, document_type_id, search,
+        parsed_date_from, parsed_date_to, confidence_min, confidence_max,
+    )
+
+    if format == "xlsx":
+        import openpyxl
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Documents"
+        ws.append(headers)
+        for row in rows:
+            ws.append(row)
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        return StreamingResponse(
+            buf,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename=documents_{project_id[:8]}.xlsx"},
+        )
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(headers)
+    writer.writerows(rows)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=documents_{project_id[:8]}.csv"},
+    )
+
+
 @router.post("/bulk-delete", status_code=200)
 async def bulk_delete_documents(
     project_id: str,
     data: BulkIds,
     db: AsyncSession = Depends(get_db),
-    user = Depends(RequirePermission("documents:write")),
+    user = Depends(RequireProjectPermission("documents:delete")),
 ):
     count = await document_service.bulk_delete_documents(db, project_id, data.ids)
     return {"deleted": count}
@@ -134,7 +205,7 @@ async def delete_document(
     project_id: str,
     document_id: str,
     db: AsyncSession = Depends(get_db),
-    user = Depends(RequirePermission("documents:write")),
+    user = Depends(RequireProjectPermission("documents:delete")),
 ):
     deleted = await document_service.delete_document(db, project_id, document_id)
     if not deleted:

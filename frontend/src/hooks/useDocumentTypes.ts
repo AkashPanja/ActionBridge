@@ -42,6 +42,16 @@ export function useUpdateDocumentType(projectId: string) {
   });
 }
 
+export function useCloneDocumentType(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ typeId, name }: { typeId: string; name: string }) =>
+      api.documentTypes.clone(projectId, typeId, { name }),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ["document-types", projectId] }),
+  });
+}
+
 export function useDeleteDocumentType(projectId: string) {
   const qc = useQueryClient();
   return useMutation({

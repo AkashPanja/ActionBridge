@@ -26,8 +26,8 @@ class TestProjectCRUD:
         })
         assert resp.status_code == 409
 
-    async def test_create_project_as_reviewer_forbidden(self, client: AsyncClient, reviewer_headers):
-        resp = await client.post("/api/v1/projects", headers=reviewer_headers, json={
+    async def test_create_project_as_reviewer_forbidden(self, client: AsyncClient, editor_headers):
+        resp = await client.post("/api/v1/projects", headers=editor_headers, json={
             "name": "Reviewer Project",
         })
         assert resp.status_code == 403
@@ -84,31 +84,31 @@ class TestProjectCRUD:
 
 
 class TestProjectVisibility:
-    async def test_public_project_visible_to_all(self, client: AsyncClient, admin_headers, reviewer_headers):
+    async def test_public_project_visible_to_all(self, client: AsyncClient, admin_headers, editor_headers):
         await client.post("/api/v1/projects", headers=admin_headers, json={
             "name": "Public Project", "visibility": "public",
         })
-        resp = await client.get("/api/v1/projects", headers=reviewer_headers)
+        resp = await client.get("/api/v1/projects", headers=editor_headers)
         assert len(resp.json()) == 1
 
-    async def test_private_project_hidden_from_non_members(self, client: AsyncClient, admin_headers, reviewer_headers):
+    async def test_private_project_hidden_from_non_members(self, client: AsyncClient, admin_headers, editor_headers):
         await client.post("/api/v1/projects", headers=admin_headers, json={
             "name": "Private Project", "visibility": "private",
         })
-        resp = await client.get("/api/v1/projects", headers=reviewer_headers)
+        resp = await client.get("/api/v1/projects", headers=editor_headers)
         assert len(resp.json()) == 0
 
 
 class TestProjectMembership:
-    async def test_invite_member(self, client: AsyncClient, admin_headers, reviewer_user):
+    async def test_invite_member(self, client: AsyncClient, admin_headers, editor_user):
         proj = await client.post("/api/v1/projects", headers=admin_headers, json={"name": "InviteTest"})
         pid = proj.json()["id"]
         resp = await client.post(f"/api/v1/projects/{pid}/invite", headers=admin_headers, json={
-            "user_id": reviewer_user.id,
+            "user_id": editor_user.id,
             "role": "viewer",
         })
         assert resp.status_code == 201
-        assert resp.json()["user_id"] == reviewer_user.id
+        assert resp.json()["user_id"] == editor_user.id
 
     async def test_list_members(self, client: AsyncClient, admin_headers):
         proj = await client.post("/api/v1/projects", headers=admin_headers, json={"name": "MembersTest"})
@@ -119,47 +119,47 @@ class TestProjectMembership:
         assert isinstance(members, list)
         assert len(members) >= 1
 
-    async def test_update_member_role(self, client: AsyncClient, admin_headers, reviewer_user):
+    async def test_update_member_role(self, client: AsyncClient, admin_headers, editor_user):
         proj = await client.post("/api/v1/projects", headers=admin_headers, json={"name": "RoleTest"})
         pid = proj.json()["id"]
         inv = await client.post(f"/api/v1/projects/{pid}/invite", headers=admin_headers, json={
-            "user_id": reviewer_user.id, "role": "viewer",
+            "user_id": editor_user.id, "role": "viewer",
         })
         mid = inv.json()["id"]
         resp = await client.patch(f"/api/v1/projects/members/{mid}/role", headers=admin_headers, json={
-            "user_id": reviewer_user.id, "role": "reviewer",
+            "user_id": editor_user.id, "role": "editor",
         })
         assert resp.status_code == 200
-        assert resp.json()["role"] == "reviewer"
+        assert resp.json()["role"] == "editor"
 
-    async def test_remove_member(self, client: AsyncClient, admin_headers, reviewer_user):
+    async def test_remove_member(self, client: AsyncClient, admin_headers, editor_user):
         proj = await client.post("/api/v1/projects", headers=admin_headers, json={"name": "RemoveTest"})
         pid = proj.json()["id"]
         inv = await client.post(f"/api/v1/projects/{pid}/invite", headers=admin_headers, json={
-            "user_id": reviewer_user.id, "role": "viewer",
+            "user_id": editor_user.id, "role": "viewer",
         })
         mid = inv.json()["id"]
         resp = await client.delete(f"/api/v1/projects/members/{mid}", headers=admin_headers)
         assert resp.status_code == 204
 
-    async def test_accept_invitation(self, client: AsyncClient, admin_headers, reviewer_user, reviewer_headers):
+    async def test_accept_invitation(self, client: AsyncClient, admin_headers, editor_user, editor_headers):
         proj = await client.post("/api/v1/projects", headers=admin_headers, json={"name": "AcceptTest"})
         pid = proj.json()["id"]
         inv = await client.post(f"/api/v1/projects/{pid}/invite", headers=admin_headers, json={
-            "user_id": reviewer_user.id, "role": "viewer",
+            "user_id": editor_user.id, "role": "viewer",
         })
         mid = inv.json()["id"]
-        resp = await client.post(f"/api/v1/invitations/{mid}/accept", headers=reviewer_headers)
+        resp = await client.post(f"/api/v1/invitations/{mid}/accept", headers=editor_headers)
         assert resp.status_code == 200
 
-    async def test_decline_invitation(self, client: AsyncClient, admin_headers, reviewer_user, reviewer_headers):
+    async def test_decline_invitation(self, client: AsyncClient, admin_headers, editor_user, editor_headers):
         proj = await client.post("/api/v1/projects", headers=admin_headers, json={"name": "DeclineTest"})
         pid = proj.json()["id"]
         inv = await client.post(f"/api/v1/projects/{pid}/invite", headers=admin_headers, json={
-            "user_id": reviewer_user.id, "role": "viewer",
+            "user_id": editor_user.id, "role": "viewer",
         })
         mid = inv.json()["id"]
-        resp = await client.post(f"/api/v1/invitations/{mid}/decline", headers=reviewer_headers)
+        resp = await client.post(f"/api/v1/invitations/{mid}/decline", headers=editor_headers)
         assert resp.status_code == 200
 
 
@@ -195,8 +195,8 @@ class TestProjectPermissions:
         resp = await client.get(f"/api/v1/projects/{pid}", headers=viewer_headers)
         assert resp.status_code == 200
 
-    async def test_reviewer_cannot_delete_project(self, client: AsyncClient, admin_headers, reviewer_headers):
+    async def test_reviewer_cannot_delete_project(self, client: AsyncClient, admin_headers, editor_headers):
         proj = await client.post("/api/v1/projects", headers=admin_headers, json={"name": "ProtectMe"})
         pid = proj.json()["id"]
-        resp = await client.delete(f"/api/v1/projects/{pid}", headers=reviewer_headers)
+        resp = await client.delete(f"/api/v1/projects/{pid}", headers=editor_headers)
         assert resp.status_code == 403

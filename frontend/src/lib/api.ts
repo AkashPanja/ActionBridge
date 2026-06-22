@@ -77,6 +77,11 @@ export const api = {
       }),
     delete: (projectId: string, typeId: string) =>
       request<void>(`/projects/${projectId}/document-types/${typeId}`, { method: "DELETE" }),
+    clone: (projectId: string, typeId: string, data: { name: string }) =>
+      request<DocumentType>(`/projects/${projectId}/document-types/${typeId}/clone`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
     bulkDelete: (projectId: string, ids: string[]) =>
       request<{ deleted: number }>(`/projects/${projectId}/document-types/bulk-delete`, {
         method: "POST",

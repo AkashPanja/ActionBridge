@@ -1,4 +1,6 @@
+from app.models.api_key_scope import ApiKeyProjectScope
 from app.models.audit_event import AuditEvent
+from app.models.audit_log import AuditLog
 from app.models.document_attachment import DocumentAttachment
 from app.models.document_comment import DocumentComment
 from app.models.document_instance import DocumentInstance
@@ -15,5 +17,6 @@ __all__ = [
     "Base", "Project", "ProjectMembership", "DocumentType",
     "DocumentInstance", "DocumentAttachment", "DocumentComment",
     "DocTypeSubscription", "Notification",
-    "AuditEvent", "AppSetting", "RegexPattern",
+    "AuditEvent", "AuditLog", "ApiKeyProjectScope",
+    "AppSetting", "RegexPattern",
 ]

@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.deps import RequirePermission, get_current_active_user
+from app.auth.permissions import check_project_permission
 from app.config import settings
 from app.database import get_db
 from app.models.document_attachment import DocumentAttachment
@@ -42,6 +43,8 @@ async def upload_attachment(
     doc = await db.get(DocumentInstance, document_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
+    if not await check_project_permission(db, user, doc.project_id, "documents:attach"):
+        raise HTTPException(status_code=403, detail="Missing project permission: documents:attach")
 
     if file.content_type not in ALLOWED_MIME_TYPES:
         raise HTTPException(
@@ -95,6 +98,12 @@ async def list_attachments(
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_active_user),
 ):
+    doc = await db.get(DocumentInstance, document_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if not await check_project_permission(db, user, doc.project_id, "documents:read"):
+        raise HTTPException(status_code=403, detail="Missing project permission: documents:read")
+
     result = await db.execute(
         select(DocumentAttachment)
         .where(DocumentAttachment.document_id == document_id)
@@ -107,7 +116,7 @@ async def list_attachments(
 async def delete_attachment(
     attachment_id: str,
     db: AsyncSession = Depends(get_db),
-    user=Depends(RequirePermission("documents:write")),
+    user=Depends(get_current_active_user),
 ):
     result = await db.execute(
         select(DocumentAttachment).where(DocumentAttachment.id == attachment_id)
@@ -115,6 +124,11 @@ async def delete_attachment(
     att = result.scalar_one_or_none()
     if not att:
         raise HTTPException(status_code=404, detail="Attachment not found")
+    doc = await db.get(DocumentInstance, att.document_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if not await check_project_permission(db, user, doc.project_id, "documents:delete"):
+        raise HTTPException(status_code=403, detail="Missing project permission: documents:delete")
     full_path = Path(settings.upload_dir) / att.file_path
     try:
         os.remove(str(full_path))

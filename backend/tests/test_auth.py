@@ -48,12 +48,12 @@ class TestAuthRegister:
             "email": "newuser@test.com",
             "password": "pass12345",
             "name": "New User",
-            "role": "reviewer",
+            "role": "editor",
         })
         assert resp.status_code == 201
         data = resp.json()
         assert data["email"] == "newuser@test.com"
-        assert data["role"] == "reviewer"
+        assert data["role"] == "editor"
 
     async def test_register_duplicate_email(self, client: AsyncClient, setup_complete):
         await client.post("/api/v1/auth/register", json={
@@ -164,17 +164,17 @@ class TestAuthUserManagement:
             "email": "created@test.com",
             "password": "pass12345",
             "name": "Created User",
-            "role": "reviewer",
+            "role": "editor",
         })
         assert resp.status_code == 201
         assert resp.json()["email"] == "created@test.com"
 
-    async def test_create_user_as_reviewer_forbidden(self, client: AsyncClient, reviewer_headers):
-        resp = await client.post("/api/v1/auth/users", headers=reviewer_headers, json={
+    async def test_create_user_as_reviewer_forbidden(self, client: AsyncClient, editor_headers):
+        resp = await client.post("/api/v1/auth/users", headers=editor_headers, json={
             "email": "shouldfail@test.com",
             "password": "pass12345",
             "name": "Should Fail",
-            "role": "reviewer",
+            "role": "editor",
         })
         assert resp.status_code == 403
 
@@ -185,8 +185,8 @@ class TestAuthUserManagement:
         assert isinstance(data, list)
         assert any(u["email"] == "admin@test.com" for u in data)
 
-    async def test_update_user(self, client: AsyncClient, admin_headers, reviewer_user):
-        resp = await client.patch(f"/api/v1/auth/users/{reviewer_user.id}", headers=admin_headers, json={
+    async def test_update_user(self, client: AsyncClient, admin_headers, editor_user):
+        resp = await client.patch(f"/api/v1/auth/users/{editor_user.id}", headers=admin_headers, json={
             "name": "Updated Name",
         })
         assert resp.status_code == 200
@@ -198,8 +198,8 @@ class TestAuthUserManagement:
         })
         assert resp.status_code == 400
 
-    async def test_delete_user(self, client: AsyncClient, admin_headers, reviewer_user):
-        resp = await client.delete(f"/api/v1/auth/users/{reviewer_user.id}", headers=admin_headers)
+    async def test_delete_user(self, client: AsyncClient, admin_headers, editor_user):
+        resp = await client.delete(f"/api/v1/auth/users/{editor_user.id}", headers=admin_headers)
         assert resp.status_code == 204
 
     async def test_delete_user_cannot_delete_self(self, client: AsyncClient, admin_headers, admin_user):
@@ -246,8 +246,8 @@ class TestAuthApiKeys:
         resp = await client.delete("/api/v1/auth/api-keys/nonexistent", headers=admin_headers)
         assert resp.status_code == 404
 
-    async def test_api_key_actions_forbidden_for_reviewer(self, client: AsyncClient, reviewer_headers):
-        resp = await client.post("/api/v1/auth/api-keys", headers=reviewer_headers, json={
+    async def test_api_key_actions_forbidden_for_reviewer(self, client: AsyncClient, editor_headers):
+        resp = await client.post("/api/v1/auth/api-keys", headers=editor_headers, json={
             "project_id": "p1", "label": "Blocked",
         })
         assert resp.status_code == 403

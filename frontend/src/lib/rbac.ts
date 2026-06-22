@@ -1,11 +1,11 @@
-const PERMISSION_MAP: Record<string, string[]> = {
-  "projects:read": ["admin", "reviewer", "viewer"],
+const GLOBAL_PERMISSION_MAP: Record<string, string[]> = {
+  "projects:read": ["admin", "editor", "viewer"],
   "projects:write": ["admin"],
-  "document_types:read": ["admin", "reviewer", "viewer"],
+  "document_types:read": ["admin", "editor", "viewer"],
   "document_types:write": ["admin"],
-  "documents:read": ["admin", "reviewer", "viewer"],
-  "documents:write": ["admin", "reviewer"],
-  "documents:approve": ["admin", "reviewer"],
+  "documents:read": ["admin", "editor", "viewer"],
+  "documents:write": ["admin", "editor"],
+  "documents:approve": ["admin", "editor"],
   "api_keys:manage": ["admin"],
   "users:manage": ["admin"],
   "settings:read": ["admin"],
@@ -14,7 +14,32 @@ const PERMISSION_MAP: Record<string, string[]> = {
 
 export function can(role: string | undefined, permission: string): boolean {
   if (!role) return false;
-  return PERMISSION_MAP[permission]?.includes(role) ?? false;
+  return GLOBAL_PERMISSION_MAP[permission]?.includes(role) ?? false;
 }
 
-export type Role = "admin" | "reviewer" | "viewer";
+const PROJECT_PERMISSION_MAP: Record<string, string[]> = {
+  "projects:read": ["owner", "editor", "approver", "viewer"],
+  "projects:write": ["owner", "editor"],
+  "projects:delete": ["owner"],
+  "document_types:read": ["owner", "editor", "approver", "viewer"],
+  "document_types:write": ["owner", "editor"],
+  "documents:read": ["owner", "editor", "approver", "viewer"],
+  "documents:write": ["owner", "editor"],
+  "documents:submit": ["owner", "editor"],
+  "documents:approve": ["owner", "editor", "approver"],
+  "documents:delete": ["owner", "editor"],
+  "members:manage": ["owner", "editor"],
+  "api_keys:manage": ["owner", "editor"],
+  "subscriptions:manage": ["owner", "editor", "approver", "viewer"],
+};
+
+export function canOnProject(
+  accessLevel: string | undefined,
+  permission: string,
+): boolean {
+  if (!accessLevel) return false;
+  return PROJECT_PERMISSION_MAP[permission]?.includes(accessLevel) ?? false;
+}
+
+export type Role = "admin" | "editor" | "viewer";
+export type ProjectAccessLevel = "owner" | "editor" | "approver" | "viewer";

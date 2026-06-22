@@ -9,15 +9,17 @@ from app.database import get_db
 bearer_scheme = HTTPBearer(auto_error=False)
 
 PERMISSION_MAP = {
-    "projects:read": ["admin", "reviewer", "viewer"],
+    "projects:read": ["admin", "editor", "viewer"],
     "projects:write": ["admin"],
-    "document_types:read": ["admin", "reviewer", "viewer"],
+    "document_types:read": ["admin", "editor", "viewer"],
     "document_types:write": ["admin"],
-    "documents:read": ["admin", "reviewer", "viewer"],
-    "documents:write": ["admin", "reviewer"],
-    "documents:approve": ["admin", "reviewer"],
+    "documents:read": ["admin", "editor", "viewer"],
+    "documents:write": ["admin", "editor"],
+    "documents:approve": ["admin", "editor"],
     "api_keys:manage": ["admin"],
     "users:manage": ["admin"],
+    "settings:read": ["admin"],
+    "settings:write": ["admin"],
 }
 
 

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ProjectCreate(BaseModel):
@@ -28,10 +28,12 @@ class ProjectResponse(BaseModel):
 
 
 class MemberResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
     id: str
     project_id: str
     user_id: str
-    role: str
+    role: str = Field(validation_alias="access_level")
     status: str
     invited_by: str | None
     user_name: str | None = None

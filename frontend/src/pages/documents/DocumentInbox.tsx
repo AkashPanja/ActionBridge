@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { FileText, Filter, Inbox, RotateCcw, Search, Trash2 } from "lucide-react";
+import { FileDown, FileText, Filter, Inbox, RotateCcw, Search, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
@@ -187,6 +187,25 @@ export function DocumentInbox({ projectId }: Props) {
           <option value="confidence_score">Confidence (high first)</option>
           <option value="updated_at">Recently updated</option>
         </select>
+        <div className="h-5 w-px bg-surface-300 dark:bg-surface-600" />
+        <button
+          onClick={() => {
+            const params = new URLSearchParams({ format: "csv" });
+            if (statusFilter) params.set("status", statusFilter);
+            if (typeFilter) params.set("document_type_id", typeFilter);
+            if (search) params.set("search", search);
+            if (dateFrom) params.set("date_from", dateFrom);
+            if (dateTo) params.set("date_to", dateTo);
+            if (confidenceMin) params.set("confidence_min", confidenceMin);
+            if (confidenceMax) params.set("confidence_max", confidenceMax);
+            window.open(`/api/v1/projects/${projectId}/documents/export?${params.toString()}`, "_blank");
+          }}
+          className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-medium text-surface-500 transition-all hover:bg-surface-100 hover:text-surface-700 dark:text-surface-400 dark:hover:bg-surface-700"
+          title="Export as CSV"
+        >
+          <FileDown className="h-4 w-4" />
+          Export
+        </button>
         <button
           onClick={clearFilters}
           className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-medium text-surface-500 transition-all hover:bg-surface-100 hover:text-surface-700 dark:text-surface-400 dark:hover:bg-surface-700"

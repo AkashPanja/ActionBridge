@@ -25,6 +25,24 @@ async def create_document_type(
     return doc_type
 
 
+async def clone_document_type(
+    db: AsyncSession, project_id: str, source_type_id: str, new_name: str
+) -> DocumentType | None:
+    source = await get_document_type(db, source_type_id)
+    if not source or source.project_id != project_id:
+        return None
+    doc_type = DocumentType(
+        project_id=project_id,
+        name=new_name,
+        schema_definition=source.schema_definition,
+        validation_rules=source.validation_rules,
+    )
+    db.add(doc_type)
+    await db.commit()
+    await db.refresh(doc_type)
+    return doc_type
+
+
 async def get_document_type(db: AsyncSession, type_id: str) -> DocumentType | None:
     result = await db.execute(
         select(DocumentType).where(

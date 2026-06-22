@@ -93,12 +93,12 @@ async def admin_headers(admin_token) -> dict:
 
 
 @pytest_asyncio.fixture
-async def reviewer_user(db_session) -> User:
+async def editor_user(db_session) -> User:
     user = User(
-        email="reviewer@test.com",
-        password_hash=hash_password("reviewer123"),
-        name="Reviewer User",
-        role="reviewer",
+        email="editor@test.com",
+        password_hash=hash_password("editor123"),
+        name="Editor User",
+        role="editor",
     )
     db_session.add(user)
     await db_session.commit()
@@ -107,17 +107,17 @@ async def reviewer_user(db_session) -> User:
 
 
 @pytest_asyncio.fixture
-async def reviewer_token(reviewer_user) -> str:
+async def editor_token(editor_user) -> str:
     return create_access_token({
-        "sub": reviewer_user.id,
-        "role": reviewer_user.role,
-        "email": reviewer_user.email,
+        "sub": editor_user.id,
+        "role": editor_user.role,
+        "email": editor_user.email,
     })
 
 
 @pytest_asyncio.fixture
-async def reviewer_headers(reviewer_token) -> dict:
-    return {"Authorization": f"Bearer {reviewer_token}"}
+async def editor_headers(editor_token) -> dict:
+    return {"Authorization": f"Bearer {editor_token}"}
 
 
 @pytest_asyncio.fixture

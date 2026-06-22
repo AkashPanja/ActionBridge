@@ -5,6 +5,7 @@ from sqlalchemy.orm import joinedload
 
 from app.auth.deps import get_current_active_user
 from app.auth.models import User
+from app.auth.permissions import RequireProjectPermission, check_project_permission
 from app.database import get_db
 from app.models.document_comment import DocumentComment
 from app.schemas.document_comment import CommentCreate, CommentResponse, CommentUpdate
@@ -17,7 +18,7 @@ async def list_comments(
     project_id: str,
     document_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    user = Depends(RequireProjectPermission("documents:comment")),
 ):
     result = await db.execute(
         select(DocumentComment)
@@ -59,7 +60,7 @@ async def create_comment(
     document_id: str,
     data: CommentCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    user = Depends(RequireProjectPermission("documents:comment")),
 ):
     if data.parent_id:
         parent = await db.get(DocumentComment, data.parent_id)
@@ -68,7 +69,7 @@ async def create_comment(
 
     comment = DocumentComment(
         document_id=document_id,
-        user_id=current_user.id,
+        user_id=user.id,
         parent_id=data.parent_id,
         content=data.content,
     )
@@ -83,7 +84,7 @@ async def create_comment(
         content=comment.content,
         created_at=comment.created_at,
         updated_at=comment.updated_at,
-        author_name=current_user.name,
+        author_name=user.name,
     )
 
 
@@ -94,7 +95,7 @@ async def update_comment(
     comment_id: str,
     data: CommentUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    user = Depends(RequireProjectPermission("documents:comment")),
 ):
     result = await db.execute(
         select(DocumentComment).where(
@@ -105,7 +106,7 @@ async def update_comment(
     comment = result.scalar_one_or_none()
     if not comment:
         raise HTTPException(status_code=404, detail="Comment not found")
-    if comment.user_id != current_user.id:
+    if comment.user_id != user.id:
         raise HTTPException(status_code=403, detail="Cannot edit another user's comment")
     comment.content = data.content
     await db.commit()
@@ -118,7 +119,7 @@ async def update_comment(
         content=comment.content,
         created_at=comment.created_at,
         updated_at=comment.updated_at,
-        author_name=current_user.name,
+        author_name=user.name,
     )
 
 
@@ -128,7 +129,7 @@ async def delete_comment(
     document_id: str,
     comment_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    user = Depends(RequireProjectPermission("documents:comment")),
 ):
     result = await db.execute(
         select(DocumentComment).where(
@@ -139,9 +140,8 @@ async def delete_comment(
     comment = result.scalar_one_or_none()
     if not comment:
         raise HTTPException(status_code=404, detail="Comment not found")
-    if comment.user_id != current_user.id:
-        from app.auth.deps import has_permission
-        if not has_permission(current_user.role, "documents:write"):
+    if comment.user_id != user.id:
+        if not await check_project_permission(db, user, project_id, "documents:write"):
             raise HTTPException(status_code=403, detail="Cannot delete another user's comment")
     await db.delete(comment)
     await db.commit()

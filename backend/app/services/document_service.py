@@ -421,6 +421,60 @@ async def delete_document(db: AsyncSession, project_id: str, document_id: str) -
     return True
 
 
+async def export_documents(
+    db: AsyncSession,
+    project_id: str,
+    fmt: str,
+    status: str | None = None,
+    document_type_id: str | None = None,
+    search: str | None = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    confidence_min: float | None = None,
+    confidence_max: float | None = None,
+) -> tuple[list[str], list[list[str | int | float | None]]]:
+    docs = await list_documents(db, project_id, status, document_type_id, search, date_from, date_to, confidence_min, confidence_max)
+
+    from app.models.document_type import DocumentType
+    type_names: dict[str, str] = {}
+    if docs:
+        type_ids = list({d.document_type_id for d in docs if d.document_type_id})
+        result = await db.execute(
+            select(DocumentType.id, DocumentType.name).where(DocumentType.id.in_(type_ids))
+        )
+        type_names = {row.id: row.name for row in result}
+
+    all_keys: list[str] = []
+    seen = set()
+    for d in docs:
+        for k in (d.extracted_data or {}):
+            if k not in seen:
+                all_keys.append(k)
+                seen.add(k)
+
+    base_cols = ["ID", "Document Type", "Status", "Confidence Score", "Created At", "Updated At"]
+    headers = base_cols + all_keys
+
+    rows: list[list[str | int | float | None]] = []
+    for d in docs:
+        import json
+        row = [
+            d.id,
+            type_names.get(d.document_type_id, ""),
+            d.status,
+            d.confidence_score,
+            d.created_at.isoformat() if d.created_at else None,
+            d.updated_at.isoformat() if d.updated_at else None,
+        ]
+        for key in all_keys:
+            val = (d.extracted_data or {}).get(key)
+            if isinstance(val, (dict, list)):
+                val = json.dumps(val)
+            row.append(val)
+        rows.append(row)
+    return headers, rows
+
+
 async def bulk_delete_documents(db: AsyncSession, project_id: str, ids: list[str]) -> int:
     result = await db.execute(
         update(DocumentInstance)

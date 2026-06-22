@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.deps import RequirePermission, get_current_active_user
+from app.auth.permissions import RequireProjectPermission, check_project_permission
 from app.database import get_db
 from app.schemas.document_type import BulkIds
 from app.schemas.project import (
@@ -43,7 +44,7 @@ async def list_projects(
 async def get_project(
     project_id: str,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_active_user),
+    user=Depends(RequireProjectPermission("projects:read")),
 ):
     project = await project_service.get_project(db, project_id)
     if not project:
@@ -56,7 +57,7 @@ async def update_project(
     project_id: str,
     data: ProjectUpdate,
     db: AsyncSession = Depends(get_db),
-    user=Depends(RequirePermission("projects:write")),
+    user=Depends(RequireProjectPermission("projects:write")),
 ):
     try:
         project = await project_service.update_project(db, project_id, data)
@@ -71,7 +72,7 @@ async def update_project(
 async def get_recent_activity(
     project_id: str,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_active_user),
+    user=Depends(RequireProjectPermission("projects:read")),
 ):
     return await project_service.get_recent_activity(db, project_id)
 
@@ -80,7 +81,7 @@ async def get_recent_activity(
 async def get_project_stats(
     project_id: str,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_active_user),
+    user=Depends(RequireProjectPermission("projects:read")),
 ):
     return await project_service.get_project_stats(db, project_id)
 
@@ -99,7 +100,7 @@ async def bulk_delete_projects(
 async def delete_project(
     project_id: str,
     db: AsyncSession = Depends(get_db),
-    user=Depends(RequirePermission("projects:write")),
+    user=Depends(RequireProjectPermission("projects:delete")),
 ):
     deleted = await project_service.delete_project(db, project_id)
     if not deleted:
@@ -110,7 +111,7 @@ async def delete_project(
 async def list_members(
     project_id: str,
     db: AsyncSession = Depends(get_db),
-    user=Depends(RequirePermission("projects:read")),
+    user=Depends(RequireProjectPermission("projects:read")),
 ):
     project = await project_service.get_project(db, project_id)
     if not project:
@@ -123,7 +124,7 @@ async def invite_member(
     project_id: str,
     data: InviteRequest,
     db: AsyncSession = Depends(get_db),
-    user=Depends(RequirePermission("projects:write")),
+    user=Depends(RequireProjectPermission("projects:manage_members")),
 ):
     project = await project_service.get_project(db, project_id)
     if not project:
@@ -139,8 +140,13 @@ async def update_member_role(
     membership_id: str,
     data: InviteRequest,
     db: AsyncSession = Depends(get_db),
-    user=Depends(RequirePermission("projects:write")),
+    user=Depends(get_current_active_user),
 ):
+    pm = await project_service.get_membership_by_id(db, membership_id)
+    if not pm:
+        raise HTTPException(status_code=404, detail="Membership not found")
+    if not await check_project_permission(db, user, pm.project_id, "projects:manage_members"):
+        raise HTTPException(status_code=403, detail="Missing project permission: projects:manage_members")
     pm = await project_service.update_member_role(db, membership_id, data.role)
     if not pm:
         raise HTTPException(status_code=404, detail="Membership not found or cannot change owner role")
@@ -151,8 +157,13 @@ async def update_member_role(
 async def remove_member(
     membership_id: str,
     db: AsyncSession = Depends(get_db),
-    user=Depends(RequirePermission("projects:write")),
+    user=Depends(get_current_active_user),
 ):
+    pm = await project_service.get_membership_by_id(db, membership_id)
+    if not pm:
+        raise HTTPException(status_code=404, detail="Membership not found")
+    if not await check_project_permission(db, user, pm.project_id, "projects:manage_members"):
+        raise HTTPException(status_code=403, detail="Missing project permission: projects:manage_members")
     removed = await project_service.remove_member(db, membership_id)
     if not removed:
         raise HTTPException(status_code=404, detail="Membership not found or cannot remove owner")

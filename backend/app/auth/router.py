@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.deps import get_current_active_user, RequirePermission
@@ -200,10 +201,19 @@ async def generate_api_key(
     db: AsyncSession = Depends(get_db),
     user=Depends(RequirePermission("api_keys:manage")),
 ):
-    api_key, raw_key = await create_api_key(db, data.project_id, data.label, data.scopes)
+    from app.auth.permissions import check_project_permission
+    if not await check_project_permission(db, user, data.project_id, "api_keys:manage"):
+        raise HTTPException(status_code=403, detail="Missing project permission: api_keys:manage")
+    from app.models.api_key_scope import ApiKeyProjectScope
+    api_key, raw_key = await create_api_key(db, data.project_id, data.label, data.scopes, project_ids=data.project_ids)
+    sr = await db.execute(
+        select(ApiKeyProjectScope).where(ApiKeyProjectScope.api_key_id == api_key.id)
+    )
+    scoped_projects = [s.project_id for s in sr.scalars().all()]
     return ApiKeyCreatedResponse(
         **{k: v for k, v in api_key.__dict__.items() if k != "_sa_instance_state"},
         raw_key=raw_key,
+        scoped_projects=scoped_projects,
     )
 
 
@@ -213,6 +223,9 @@ async def list_project_api_keys(
     db: AsyncSession = Depends(get_db),
     user=Depends(RequirePermission("api_keys:manage")),
 ):
+    from app.auth.permissions import check_project_permission
+    if not await check_project_permission(db, user, project_id, "api_keys:manage"):
+        raise HTTPException(status_code=403, detail="Missing project permission: api_keys:manage")
     return await list_api_keys(db, project_id)
 
 
@@ -222,6 +235,12 @@ async def delete_api_key(
     db: AsyncSession = Depends(get_db),
     user=Depends(RequirePermission("api_keys:manage")),
 ):
+    from app.auth.permissions import check_project_permission
+    from app.auth.models import ApiKey
+    result = await db.execute(select(ApiKey).where(ApiKey.id == key_id))
+    ak = result.scalar_one_or_none()
+    if ak and not await check_project_permission(db, user, ak.project_id, "api_keys:manage"):
+        raise HTTPException(status_code=403, detail="Missing project permission: api_keys:manage")
     deleted = await revoke_api_key(db, key_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="API key not found")

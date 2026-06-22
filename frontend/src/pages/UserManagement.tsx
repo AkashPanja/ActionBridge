@@ -155,7 +155,7 @@ export function UserManagement() {
                 <select value={createRole} onChange={(e) => setCreateRole(e.target.value)}
                   className="mt-1 w-full rounded-lg border border-surface-300 bg-white px-3 py-2 text-sm focus:border-accent-500 focus:outline-none dark:border-surface-600 dark:bg-surface-800 dark:text-surface-100">
                   <option value="viewer">Viewer</option>
-                  <option value="reviewer">Reviewer</option>
+                  <option value="editor">Editor</option>
                   <option value="admin">Admin</option>
                 </select>
               </div>
@@ -182,7 +182,7 @@ export function UserManagement() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="truncate text-sm font-semibold text-surface-900 dark:text-surface-100">{u.name}</span>
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${u.role === "admin" ? "bg-brand-100 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300" : u.role === "reviewer" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300" : "bg-surface-100 text-surface-600 dark:bg-surface-700 dark:text-surface-300"}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${u.role === "admin" ? "bg-brand-100 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300" : u.role === "editor" ? "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300" : "bg-surface-100 text-surface-600 dark:bg-surface-700 dark:text-surface-300"}`}>
                       {u.role}
                     </span>
                     {!u.is_active ? (
@@ -198,7 +198,7 @@ export function UserManagement() {
                     className="rounded-lg border border-surface-200 bg-white px-2 py-1.5 text-xs focus:border-brand-500 focus:outline-none dark:border-surface-600 dark:bg-surface-800 dark:text-surface-100"
                   >
                     <option value="admin">Admin</option>
-                    <option value="reviewer">Reviewer</option>
+                    <option value="editor">Editor</option>
                     <option value="viewer">Viewer</option>
                   </select>
                   <Button variant="ghost" size="sm" onClick={() => toggleActive(u)} title={u.is_active ? "Deactivate" : "Activate"}>
