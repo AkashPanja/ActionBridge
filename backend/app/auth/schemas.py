@@ -29,6 +29,7 @@ class UserResponse(BaseModel):
     name: str
     role: str
     is_active: bool
+    preferences: dict = {}
     created_at: datetime
 
 
@@ -40,6 +41,8 @@ class SetupRequest(BaseModel):
     name: str
     email: str
     password: str
+    company_name: str = "Action Bridge"
+    company_logo: str = ""
     smtp_host: str | None = None
     smtp_port: int | None = None
     smtp_username: str | None = None
@@ -64,6 +67,10 @@ class UpdateUserRequest(BaseModel):
 class PasswordChangeRequest(BaseModel):
     current_password: str
     new_password: str
+
+
+class UserPreferencesUpdate(BaseModel):
+    theme: str | None = None
 
 
 class PasswordResetRequest(BaseModel):

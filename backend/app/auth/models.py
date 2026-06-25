@@ -21,6 +21,7 @@ class User(Base):
         CheckConstraint(role.in_(["admin", "editor", "viewer"]), name="ck_users_role"),
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    preferences: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=dict)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

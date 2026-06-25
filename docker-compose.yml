@@ -1,6 +1,7 @@
 services:
   db:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: doc_action_center
       POSTGRES_USER: postgres
@@ -16,7 +17,9 @@ services:
       retries: 5
 
   api:
-    build: ./backend
+    image: akashpanja/actionbridge-api:latest
+    # build: ./backend   # uncomment to build locally instead
+    restart: unless-stopped
     ports:
       - "8000:8000"
     depends_on:
@@ -24,10 +27,22 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/doc_action_center
-      # For local dev without Docker, comment the above and uncomment:
-      # DATABASE_URL: sqlite+aiosqlite:///./doc_action_center.db
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production-use-a-long-random-string}
+      DEBUG: ${DEBUG:-false}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:80,http://localhost:5173}
+      UPLOAD_DIR: /app/uploads
     volumes:
-      - ./backend:/app
+      - uploads:/app/uploads
+
+  frontend:
+    image: akashpanja/actionbridge-frontend:latest
+    # build: ./frontend  # uncomment to build locally instead
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - api
 
 volumes:
   pgdata:
+  uploads:

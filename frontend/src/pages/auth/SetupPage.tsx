@@ -8,6 +8,7 @@ import { useAuth } from "../../contexts/AuthContext";
 
 const steps = [
   { id: "account", label: "Admin Account", icon: ShieldCheck },
+  { id: "company", label: "Company", icon: Settings },
   { id: "smtp", label: "Email (optional)", icon: Mail },
   { id: "review", label: "Review", icon: Settings },
 ];
@@ -21,6 +22,7 @@ export function SetupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [companyName, setCompanyName] = useState("Action Bridge");
   const [smtpEnabled, setSmtpEnabled] = useState(false);
   const [smtpHost, setSmtpHost] = useState("");
   const [smtpPort, setSmtpPort] = useState("587");
@@ -45,7 +47,7 @@ export function SetupPage() {
             smtp_use_tls: smtpUseTls,
           }
         : undefined;
-      await completeSetup(name, email, password, smtp);
+      await completeSetup(name, email, password, smtp, companyName);
       navigate("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Setup failed");
@@ -62,7 +64,7 @@ export function SetupPage() {
       if (password.length < 4) { setError("Password must be at least 4 characters"); return; }
       if (password !== confirmPassword) { setError("Passwords do not match"); return; }
     }
-    if (step === 1 && smtpEnabled) {
+    if (step === 2 && smtpEnabled) {
       if (!smtpHost.trim()) { setError("SMTP host is required"); return; }
     }
     setStep((s) => Math.min(s + 1, steps.length - 1));
@@ -149,6 +151,10 @@ export function SetupPage() {
                 </div>
               ) : step === 1 ? (
                 <div className="space-y-4">
+                  <Input label="Company Name" placeholder="Action Bridge" value={companyName} onChange={(e) => setCompanyName(e.target.value)} id="company-name" />
+                </div>
+              ) : step === 2 ? (
+                <div className="space-y-4">
                   <label className="flex items-center gap-2 text-sm font-medium text-surface-700 dark:text-surface-300">
                     <input
                       type="checkbox"
@@ -194,6 +200,10 @@ export function SetupPage() {
                     <div className="flex items-center justify-between px-4 py-3">
                       <span className="text-sm text-surface-500">Email</span>
                       <span className="text-sm font-medium text-surface-900 dark:text-surface-100">{email}</span>
+                    </div>
+                    <div className="flex items-center justify-between px-4 py-3">
+                      <span className="text-sm text-surface-500">Company</span>
+                      <span className="text-sm font-medium text-surface-900 dark:text-surface-100">{companyName}</span>
                     </div>
                     <div className="flex items-center justify-between px-4 py-3">
                       <span className="text-sm text-surface-500">Email notifications</span>

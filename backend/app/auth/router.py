@@ -17,6 +17,7 @@ from app.auth.schemas import (
     SetupStatusResponse,
     TokenResponse,
     UpdateUserRequest,
+    UserPreferencesUpdate,
     UserResponse,
 )
 from app.auth.service import (
@@ -57,6 +58,11 @@ async def setup(data: SetupRequest, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=409, detail="System is already set up")
 
     user = await create_initial_admin(db, data)
+
+    await save_setting(db, "company", {
+        "name": data.company_name,
+        "logo": data.company_logo,
+    })
 
     if data.smtp_host:
         smtp_settings = {
@@ -99,6 +105,21 @@ async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
 @router.get("/me", response_model=UserResponse)
 async def me(user=Depends(get_current_active_user)):
     return user
+
+
+@router.patch("/me/preferences", response_model=UserResponse)
+async def update_preferences(
+    data: UserPreferencesUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_active_user),
+):
+    prefs = dict(current_user.preferences or {})
+    if data.theme is not None:
+        prefs["theme"] = data.theme
+    current_user.preferences = prefs
+    await db.commit()
+    await db.refresh(current_user)
+    return current_user
 
 
 @router.post("/me/password", status_code=200)

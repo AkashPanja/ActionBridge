@@ -9,7 +9,7 @@ interface AuthContextType {
   isLoading: boolean;
   setupRequired: boolean;
   login: (email: string, password: string) => Promise<void>;
-  completeSetup: (name: string, email: string, password: string, smtp?: Record<string, unknown>) => Promise<void>;
+  completeSetup: (name: string, email: string, password: string, smtp?: Record<string, unknown>, companyName?: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -67,8 +67,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user);
   }
 
-  async function completeSetup(name: string, email: string, password: string, smtp?: Record<string, unknown>) {
+  async function completeSetup(name: string, email: string, password: string, smtp?: Record<string, unknown>, companyName?: string) {
     const body: Record<string, unknown> = { name, email, password };
+    body.company_name = companyName || "Action Bridge";
     if (smtp) Object.assign(body, smtp);
     const res = await fetch(`${API_BASE}/auth/setup`, {
       method: "POST",

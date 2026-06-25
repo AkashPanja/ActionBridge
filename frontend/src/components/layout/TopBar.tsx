@@ -2,6 +2,7 @@ import { Bell, KeyRound, Moon, Sun } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
+import { useTheme } from "../../contexts/ThemeContext";
 import { cn } from "../../lib/utils";
 
 const API_BASE = "/api/v1";
@@ -17,9 +18,11 @@ interface Notification {
 }
 
 export function TopBar() {
-  const [dark, setDark] = useState(false);
+  const { dark, toggleTheme } = useTheme();
   const location = useLocation();
   const { token, user } = useAuth();
+  const [companyName, setCompanyName] = useState("Action Bridge");
+  const [companyLogo, setCompanyLogo] = useState("");
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifs, setShowNotifs] = useState(false);
@@ -32,13 +35,19 @@ export function TopBar() {
   const notifRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const isDark = document.documentElement.classList.contains("dark");
-    setDark(isDark);
-  }, []);
-
-  useEffect(() => {
     if (!token) return;
     fetchNotifications();
+    fetch(`${API_BASE}/settings`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (data?.company) {
+          setCompanyName(data.company.name || "Action Bridge");
+          setCompanyLogo(data.company.logo || "");
+        }
+      })
+      .catch(() => {});
     const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
   }, [token]);
@@ -107,12 +116,6 @@ export function TopBar() {
     setPwLoading(false);
   }
 
-  function toggleTheme() {
-    const next = !dark;
-    setDark(next);
-    document.documentElement.classList.toggle("dark", next);
-  }
-
   const crumbs = location.pathname
     .split("/")
     .filter(Boolean)
@@ -143,6 +146,13 @@ export function TopBar() {
           </span>
         ))}
       </nav>
+
+      <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2">
+        {companyLogo ? (
+          <img src={companyLogo} alt={companyName} className="h-6 w-6 rounded object-contain" />
+        ) : null}
+        <span className="text-sm font-semibold text-surface-800 dark:text-surface-200">{companyName}</span>
+      </div>
 
       <div className="flex items-center gap-2">
         <button
