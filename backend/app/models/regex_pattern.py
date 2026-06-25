@@ -8,7 +8,7 @@ from app.models.project import Base
 
 
 class RegexPattern(Base):
-    __tablename__ = "regex_patterns"
+    __tablename__ = "regex_rules"
 
     id: Mapped[str] = mapped_column(
         String(36), primary_key=True, default=lambda: str(uuid.uuid4())

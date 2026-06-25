@@ -1,4 +1,4 @@
-"""regex_patterns table
+"""regex_rules table
 
 Revision ID: 004
 Revises: 003
@@ -17,7 +17,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     op.create_table(
-        "regex_patterns",
+        "regex_rules",
         sa.Column("id", sa.String(36), primary_key=True),
         sa.Column("name", sa.String(255), unique=True, index=True, nullable=False),
         sa.Column("pattern", sa.Text, nullable=False),
@@ -29,4 +29,4 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_table("regex_patterns")
+    op.drop_table("regex_rules")
